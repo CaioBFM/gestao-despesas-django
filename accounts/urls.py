@@ -13,4 +13,5 @@ urlpatterns = [
             ),
         name="login",
         ),
+    path("perfil/", views.perfil_usuario, name="perfil"),
 ]
