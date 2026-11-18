@@ -148,7 +148,7 @@ erDiagram
         boolean is_active
         timestamp created_at
     }
-
+ 
     GROUP_MEMBERSHIPS {
         bigint id PK
         bigint user_id FK
