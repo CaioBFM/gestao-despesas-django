@@ -1,0 +1,63 @@
+
+{% extends "base.html" %}
+
+{% block titulo %}Login - SplitExpenses{% endblock %}
+
+{% block conteudo %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="text-center mb-4">Entrar</h2>
+
+                {% if form.errors %}
+                    <div class="alert alert-danger">
+                        Usuário ou senha inválidos.
+                    </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="username" class="form-label">
+                            Usuário
+                        </label>
+                        <input type="text"
+                               name="username"
+                               id="username"
+                               class="form-control"
+                               autocomplete="username"
+                               required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label">
+                            Senha
+                        </label>
+                        <input type="password"
+                               name="password"
+                               id="password"
+                               class="form-control"
+                               autocomplete="current-password"
+                               required>
+                    </div>
+
+                    {% if next %}
+                        <input type="hidden" name="next" value="{{ next }}">
+                    {% endif %}
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        Entrar
+                    </button>
+                </form>
+
+                <p class="text-center mt-3 mb-0">
+                    Não possui conta?
+                    <a href="{% url 'cadastro' %}">Cadastre-se</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
