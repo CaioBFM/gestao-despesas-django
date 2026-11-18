@@ -5,6 +5,7 @@
 O projeto propõe facilitar o controle de despesas compartilhadas entre grupos, inspirado em ferramentas como o Splitwise. No Checkpoint 1, o foco implementado está na modelagem relacional e na administração dos dados pelo Django Admin. As interfaces de usuário final e os fluxos completos de participação e divisão de despesas permanecem planejados para etapas posteriores.
 
 ---
+
 ## Integrantes do Projeto
 
 | INTEGRANTE | GITHUB |
@@ -27,70 +28,124 @@ O controle de versão e a colaboração da equipe foram gerenciados através do 
 
 ## Instruções para Instalação
 
-Para executar o Checkpoint 1, tenha Python 3 e PostgreSQL disponíveis. Na raiz do repositório:
+As instruções abaixo são destinadas ao **Ubuntu/Linux**. O projeto utiliza Python 3, Django, Git e PostgreSQL.
 
-1. Clone o repositório e entre na pasta:
+### 1. Instalar as dependências do sistema
+
+```bash
+sudo apt update
+sudo apt install -y git python3-venv python3-pip postgresql postgresql-contrib
+```
+
+### 2. Configurar o PostgreSQL
+
+Inicie o serviço:
+
+```bash
+sudo service postgresql start
+```
+
+Crie um usuário para a aplicação e defina uma senha quando solicitado:
+
+```bash
+sudo -u postgres createuser --pwprompt gestao_despesas
+```
+
+Crie o banco de dados associado a esse usuário:
+
+```bash
+sudo -u postgres createdb -O gestao_despesas gestao_despesas_db
+```
+
+A criação do usuário e do banco precisa ser realizada apenas uma vez.
+
+### 3. Clonar o repositório
 
 ```bash
 git clone https://github.com/GUSTAVO-ALESSANDRO/gestao-despesas-django.git
 cd gestao-despesas-django
 ```
 
-2. Crie e ative o ambiente virtual:
+### 4. Configurar o ambiente Python
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-
+python -m pip install -r requirements.txt
 ```
 
-3. Instale as dependências:
+### 5. Configurar as variáveis de ambiente
+
+Crie o arquivo `.env` a partir do exemplo existente no repositório:
 
 ```bash
-pip install -r requirements.txt
+cp .env.example .env
 ```
 
-4. Crie `.env` manualmente na raiz do projeto (não há `.env.example`). Preencha os valores abaixo; gere `SECRET_KEY` com `python3 -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`.
+Edite o `.env` com as informações do PostgreSQL:
 
-```bash
-SECRET_KEY=chave-gerada
+```ini
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
-DB_NAME=nome_do_banco
-DB_USER=usuario_postgres
-DB_PASSWORD=senha_postgres
+DB_NAME=gestao_despesas_db
+DB_USER=gestao_despesas
+DB_PASSWORD=sua_senha
 DB_HOST=localhost
 DB_PORT=5432
-
 ```
 
-5. Crie o banco PostgreSQL indicado no `.env`, aplique as migrations e crie um administrador:
+Substitua `sua_senha` pela senha definida na etapa 2. Gere a chave secreta do Django:
 
 ```bash
-createdb -h localhost -p 5432 -U usuario_postgres nome_do_banco
-python3 manage.py migrate
-python3 manage.py createsuperuser
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
+
+Adicione ao `.env` a linha `SECRET_KEY=chave_gerada`, substituindo `chave_gerada` pelo resultado do comando.
+
+**Importante:** o `.env` contém credenciais sensíveis e não deve ser enviado ao GitHub.
+
+### 6. Criar as tabelas e o administrador
+
+Aplique as migrações:
+
+```bash
+python manage.py migrate
+```
+
+Crie um superusuário para acessar o painel administrativo:
+
+```bash
+python manage.py createsuperuser
+```
+
+> Se pretende usar o script de dados de demonstração abaixo, execute-o **em vez de** criar o superusuário, pois ele apaga os usuários existentes e cria uma conta administrativa de exemplo.
 
 ---
 
 ## Instruções para Execução
 
-Após concluir a instalação e configurar o banco de dados, execute o servidor de desenvolvimento local com o seguinte comando:
+Com o ambiente virtual ativado e o PostgreSQL em execução, inicie a aplicação:
 
 ```bash
-python3 manage.py runserver
+python manage.py runserver
 ```
 
-Com o servidor em execução, abra o seu navegador de preferência e acesse o endereço `[http://127.0.0.1:8000/](http://127.0.0.1:8000/)` para interagir com a aplicação web.
+Acesse no navegador:
+
+- Aplicação: http://127.0.0.1:8000/
+- Painel administrativo: http://127.0.0.1:8000/admin/
 
 ### Dados de demonstração (opcional)
 
-`clear_and_populate.sql` corresponde às tabelas e relacionamentos atuais. **O script apaga todos os registros existentes e reinicia as sequências antes de inserir os dados de exemplo. Use somente em banco descartável de desenvolvimento/demonstração.** Execute depois de `migrate`; ele cria uma conta administrativa de demonstração (`admin` / `admin`), então não execute `createsuperuser` antes da população:
+O arquivo `clear_and_populate.sql` insere usuários, grupos, despesas e divisões de exemplo. **Ele apaga os dados existentes e reinicia as sequências antes da inserção. Utilize-o somente em um banco descartável de desenvolvimento.**
+
+Depois de executar `migrate`, rode:
 
 ```bash
-psql -h localhost -p 5432 -U usuario_postgres -d nome_do_banco -W -f clear_and_populate.sql
+psql -h localhost -p 5432 -U gestao_despesas -d gestao_despesas_db -W -v ON_ERROR_STOP=1 --single-transaction -f clear_and_populate.sql
 ```
+
+O script cria uma conta de demonstração para o Django Admin (`admin` / `admin`). Essas credenciais são apenas para uso local e não devem ser utilizadas em produção.
 
 ---
 
@@ -124,7 +179,6 @@ erDiagram
     USERS ||--o{ EXPENSES : "cadastra (created_by)"
     EXPENSES ||--o{ EXPENSE_SPLITS : "divide em faturas"
     USERS ||--o{ EXPENSE_SPLITS : "deve (user_id)"
-
     USERS {
         bigint id PK
         string username
@@ -138,7 +192,6 @@ erDiagram
         boolean is_superuser
         timestamp created_at
     }
-
     GROUPS {
         bigint id PK
         string name
@@ -148,7 +201,6 @@ erDiagram
         boolean is_active
         timestamp created_at
     }
- 
     GROUP_MEMBERSHIPS {
         bigint id PK
         bigint user_id FK
@@ -157,7 +209,6 @@ erDiagram
         boolean is_accepted
         timestamp joined_at
     }
-
     EXPENSES {
         bigint id PK
         bigint group_id FK
@@ -169,7 +220,6 @@ erDiagram
         date date
         timestamp created_at
     }
-
     EXPENSE_SPLITS {
         bigint id PK
         bigint expense_id FK
@@ -177,7 +227,6 @@ erDiagram
         decimal amount_owed
         boolean is_paid
     }
-
 ```
 
 ---
@@ -204,6 +253,7 @@ gestao-despesas-django/
 ├── manage.py
 ├── README.md
 ├── requirements.txt
+├── .env.example
 ├── .env (criado localmente; não versionado)
 ├── gestao_despesas/
 │   ├── __init__.py
@@ -240,19 +290,15 @@ gestao-despesas-django/
 ├── static/
 │   └── js/ (charts.js, theme.js)
 └── staticfiles/ (saída gerada para arquivos estáticos)
-
 ```
 
 * **gestao_despesas/**: Pasta principal que contém os arquivos de configuração global do projeto.
 * **settings.py**: Arquivo onde são definidas as configurações gerais, conexões com o PostgreSQL, aplicativos instalados e middlewares.
 * **urls.py**: Arquivo central que mapeia as rotas globais da aplicação web para os aplicativos correspondentes.
-
-
 * **accounts/**: Modelo customizado de usuário e administração de usuários.
 * **expenses/**: Modelos de grupos, memberships, despesas e divisões, com validações e configuração administrativa.
 * **static/**: Scripts usados pelo tema e pelos gráficos do admin.
-
-
 * **manage.py**: Utilitário de linha de comando principal do Django que permite interagir com o projeto para executar tarefas administrativas, como rodar o servidor de desenvolvimento, aplicar migrações e criar superusuários.
+* **.env.example**: Modelo versionado das variáveis de ambiente.
 * **.env**: Arquivo de configuração local (não versionado) com chave, modo de execução, hosts e credenciais do PostgreSQL.
 * **README.md**: Documentação principal do projeto que apresenta a visão geral do sistema, instruções de instalação, arquitetura de pastas e guias de execução.
