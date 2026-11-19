@@ -62,6 +62,8 @@ def _user_participation_status(user, expense):
     split = next((s for s in expense.splits.all() if s.user_id == user.pk), None)
     if split is None:
         return 'Não participa', None
+    if expense.paid_by_id == user.pk:
+        return 'Cota própria', split
     if split.is_paid:
         return 'Paga', split
     return 'A pagar', split
@@ -186,8 +188,9 @@ def group_detail(request, pk):
 
     for exp in expenses_qs:
         status_label, user_split = _user_participation_status(request.user, exp)
-        paid_splits_count = sum(1 for s in exp.splits.all() if s.is_paid)
-        total_splits_count = len(exp.splits.all())
+        obligations = [s for s in exp.splits.all() if s.user_id != exp.paid_by_id]
+        paid_splits_count = sum(1 for s in obligations if s.is_paid)
+        total_splits_count = len(obligations)
         can_manage = _can_manage_expense(request.user, exp, group, membership)
 
         total_group_amount += exp.amount
@@ -400,8 +403,10 @@ def expense_detail(request, pk):
         })
 
     total_splits = sum((s.amount_owed for s in expense.splits.all()), Decimal('0.00'))
-    paid_total = sum((s.amount_owed for s in expense.splits.all() if s.is_paid), Decimal('0.00'))
-    remaining_total = total_splits - paid_total
+    paid_total = sum((s.amount_owed for s in expense.splits.all()
+                      if s.is_paid and s.user_id != expense.paid_by_id), Decimal('0.00'))
+    remaining_total = sum((s.amount_owed for s in expense.splits.all()
+                           if not s.is_paid and s.user_id != expense.paid_by_id), Decimal('0.00'))
 
     return render(request, 'expenses/expense_detail.html', {
         'expense': expense,

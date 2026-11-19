@@ -539,3 +539,50 @@ class SplitAmountValidationTests(TestCase):
         expense = Expense.objects.get(group=self.group, title='Percentual')
         amounts = dict(expense.splits.values_list('user_id', 'amount_owed'))
         self.assertEqual(amounts, {self.users[0].pk: Decimal('0.02'), self.users[1].pk: Decimal('0.01')})
+
+
+class ExpenseBalanceDisplayTests(TestCase):
+    def setUp(self):
+        self.payer = CustomUser.objects.create_user(username='balance_payer')
+        self.debtor = CustomUser.objects.create_user(username='balance_debtor')
+        self.other = CustomUser.objects.create_user(username='balance_other')
+        self.group = Group.objects.create(name='Saldos', created_by=self.payer)
+        for user in (self.debtor, self.other):
+            GroupMembership.objects.create(group=self.group, user=user, is_accepted=True)
+        self.expense = Expense.objects.create(group=self.group, paid_by=self.payer, created_by=self.payer, title='Conta', amount=Decimal('100.00'), date=date(2026, 11, 19))
+        self.own = ExpenseSplit.objects.create(expense=self.expense, user=self.payer, amount_owed=Decimal('40.00'))
+        self.pending = ExpenseSplit.objects.create(expense=self.expense, user=self.debtor, amount_owed=Decimal('35.00'))
+        self.paid = ExpenseSplit.objects.create(expense=self.expense, user=self.other, amount_owed=Decimal('25.00'), is_paid=True)
+
+    def test_saldos_e_status_do_pagador_ignoram_cota_propria(self):
+        self.client.force_login(self.payer)
+        for paid in (False, True):
+            with self.subTest(own_paid=paid):
+                self.own.is_paid = paid
+                self.own.save()
+                detail = self.client.get(reverse('expense_detail', args=[self.expense.pk]))
+                self.assertEqual(detail.context['remaining_total'], Decimal('35.00'))
+                self.assertEqual(detail.context['paid_total'], Decimal('25.00'))
+                self.assertEqual(detail.context['total_splits'], Decimal('100.00'))
+                self.assertEqual(detail.context['user_status'], 'Cota própria')
+                self.assertContains(detail, 'Cota própria')
+                group = self.client.get(reverse('group_detail', args=[self.group.pk]))
+                self.assertEqual(group.context['total_to_pay_by_user'], Decimal('0.00'))
+                self.assertEqual(group.context['expense_items'][0]['paid_splits_count'], 1)
+                self.assertEqual(group.context['expense_items'][0]['total_splits_count'], 2)
+                self.assertContains(group, 'Cota própria')
+                self.assertContains(self.client.get(reverse('expense_list_all')), 'Cota própria')
+
+    def test_total_usuario_inclui_apenas_divisoes_pendentes_de_outras_pessoas(self):
+        self.client.force_login(self.debtor)
+        group = self.client.get(reverse('group_detail', args=[self.group.pk]))
+        self.assertEqual(group.context['total_to_pay_by_user'], Decimal('35.00'))
+        self.assertEqual(group.context['expense_items'][0]['user_status'], 'A pagar')
+        self.pending.is_paid = True
+        self.pending.save()
+        group = self.client.get(reverse('group_detail', args=[self.group.pk]))
+        self.assertEqual(group.context['total_to_pay_by_user'], Decimal('0.00'))
+        detail = self.client.get(reverse('expense_detail', args=[self.expense.pk]))
+        self.assertEqual(detail.context['remaining_total'], Decimal('0.00'))
+        self.assertEqual(detail.context['paid_total'], Decimal('60.00'))
+        self.assertEqual(detail.context['user_status'], 'Paga')
