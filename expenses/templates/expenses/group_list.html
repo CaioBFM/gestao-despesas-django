@@ -20,13 +20,13 @@
 </section>
 <section class="se-groups-grid" aria-label="Meus grupos">
     {% for group in groups %}
-    <article class="se-groups-panel se-group-card">
+    <a href="{% url 'group_detail' group.pk %}" class="se-groups-panel se-group-card">
         <span class="se-group-icon" aria-hidden="true"><i class="fa-solid fa-users"></i></span>
         <h2>{{ group.name }}</h2>
         <p class="se-group-description">{{ group.description|default:'Sem descrição informada.' }}</p>
         <p class="se-group-code">Código de convite <strong>{{ group.invite_code }}</strong></p>
-        <a href="{% url 'group_detail' group.pk %}" class="se-group-link">Acessar grupo <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
-    </article>
+        <span class="se-group-link">Acessar grupo <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
     {% empty %}
     <div class="se-groups-panel se-groups-empty"><i class="fa-regular fa-folder-open" aria-hidden="true"></i><p>Você ainda não participa de nenhum grupo ativo.</p></div>
     {% endfor %}

@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import F, Q
 from .models import Group, GroupMembership, Expense, ExpenseSplit
 from .forms import GroupForm, JoinGroupForm, ExpenseForm, parse_splits_from_post
+from .services import calculate_participant_balances
 
 
 def _get_accepted_membership(user, group):
@@ -217,6 +218,7 @@ def group_detail(request, pk):
         'expense_items': expense_items,
         'total_group_amount': total_group_amount,
         'total_to_pay_by_user': total_to_pay_by_user,
+        'participant_balances': calculate_participant_balances(group, request.user),
     })
 
 

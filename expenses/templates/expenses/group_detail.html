@@ -20,6 +20,19 @@
     <article class="se-groups-panel se-detail-balance se-detail-due"><span class="se-detail-icon"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></span><div><p>Seu total pendente a pagar</p><strong>R$ {{ total_to_pay_by_user|floatformat:2 }}</strong></div></article>
 </div>
 
+<section class="se-groups-panel se-detail-panel" aria-labelledby="balance-title">
+    <div class="se-detail-panel-heading"><h2 id="balance-title">Seu balanço no grupo</h2></div>
+    <ul class="se-participant-balances">
+        {% for balance in participant_balances %}
+        <li class="se-participant-balance{% if balance.direction == 'DEVE' %} se-balance-owed{% elif balance.direction == 'RECEBE' %} se-balance-receivable{% endif %}">
+            {% if balance.direction == 'DEVE' %}Você deve <strong>R$ {{ balance.net_amount|floatformat:'2g' }}</strong> a <strong>{{ balance.participant.get_full_name|default:balance.participant.username }}</strong>
+            {% elif balance.direction == 'RECEBE' %}<strong>{{ balance.participant.get_full_name|default:balance.participant.username }}</strong> te deve <strong>R$ {{ balance.net_amount|floatformat:'2g' }}</strong>
+            {% else %}Você e <strong>{{ balance.participant.get_full_name|default:balance.participant.username }}</strong> estão em dia{% endif %}
+        </li>
+        {% empty %}<li class="se-participant-balance">Você não possui pendências neste grupo.</li>{% endfor %}
+    </ul>
+</section>
+
 <section class="se-groups-panel se-detail-panel" aria-labelledby="expenses-title">
     <div class="se-detail-panel-heading"><h2 id="expenses-title">Despesas do grupo</h2><a href="{% url 'expense_create' group.pk %}" class="se-groups-button se-groups-button-primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Nova despesa</a></div>
     <div class="se-detail-table-wrap"><table class="se-detail-table">
