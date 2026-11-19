@@ -5,7 +5,8 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.contrib import admin
 from django.test import RequestFactory
-from django.test import TestCase
+from django.urls import reverse
+from django.test import Client, TestCase
 
 from accounts.models import CustomUser
 from .models import Group, GroupMembership, Expense, ExpenseSplit
@@ -23,15 +24,13 @@ class GroupModelTests(TestCase):
         self.assertTrue(membership.is_accepted)
         self.assertTrue(membership.is_group_admin)
 
-    def test_atualizar_criador_associa_novo_criador_sem_remover_dados_existentes(self):
+    def test_atualizar_criador_nao_cria_associacao_administrativa(self):
         new_creator = CustomUser.objects.create_user(username='novo_criador', password='senha-forte-123')
         group = Group.objects.create(name='Viagem', created_by=self.user)
         group.created_by = new_creator
         group.save()
 
-        membership = GroupMembership.objects.get(group=group, user=new_creator)
-        self.assertTrue(membership.is_accepted)
-        self.assertTrue(membership.is_group_admin)
+        self.assertFalse(GroupMembership.objects.filter(group=group, user=new_creator).exists())
         self.assertTrue(GroupMembership.objects.filter(group=group, user=self.user).exists())
 
     def test_mantem_codigo_de_convite_informado(self):
@@ -68,11 +67,14 @@ class GroupMembershipModelTests(TestCase):
         with self.assertRaises(ValidationError):
             membership.save()
 
-    def test_criador_nao_pode_ser_removido_de_seu_vinculo_administrativo(self):
+    def test_criador_pode_deixar_de_ser_membro_aceito_e_administrador(self):
         membership = GroupMembership.objects.get(user=self.user, group=self.group)
         membership.is_accepted = False
-        with self.assertRaises(ValidationError):
-            membership.save()
+        membership.is_group_admin = False
+        membership.save()
+        membership.refresh_from_db()
+        self.assertFalse(membership.is_accepted)
+        self.assertFalse(membership.is_group_admin)
 
 
 class ExpenseModelTests(TestCase):
@@ -239,3 +241,140 @@ class AdminFiltersTests(TestCase):
         unfiltered = self.client.get('/admin/expenses/expense/')
         self.assertEqual(len(unfiltered.context['expenses_json']), unfiltered.context['cl'].queryset.count())
         self.assertEqual(len(unfiltered.context['expenses_json']), 2)
+
+
+class GroupAdministrationTests(TestCase):
+    def setUp(self):
+        self.creator = CustomUser.objects.create_user(username='criador')
+        self.other = CustomUser.objects.create_user(username='outro')
+        self.group = Group.objects.create(name='Grupo', created_by=self.creator)
+        self.creator_membership = GroupMembership.objects.get(group=self.group, user=self.creator)
+        self.other_membership = GroupMembership.objects.create(
+            group=self.group, user=self.other, is_accepted=True,
+        )
+        self.client.force_login(self.creator)
+        self.leave_url = reverse('group_leave', args=[self.group.pk])
+        self.action_url = reverse(
+            'member_action', args=[self.group.pk, self.creator_membership.pk],
+        )
+
+    def add_other_admin(self):
+        self.other_membership.is_group_admin = True
+        self.other_membership.save()
+
+    def test_criador_pode_sair_com_outro_administrador(self):
+        self.add_other_admin()
+        response = self.client.post(self.leave_url)
+        self.assertRedirects(response, reverse('group_list'))
+        self.assertFalse(GroupMembership.objects.filter(pk=self.creator_membership.pk).exists())
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.created_by, self.creator)
+
+    def test_ultimo_administrador_nao_pode_sair(self):
+        response = self.client.post(self.leave_url, {'confirm_delete': 'yes'}, follow=True)
+        self.assertTrue(GroupMembership.objects.filter(pk=self.creator_membership.pk).exists())
+        self.assertContains(response, 'alert alert-warning')
+        self.assertContains(response, 'Você é o último administrador deste grupo. Promova outro participante a administrador antes de sair.')
+
+    def test_unico_membro_precisa_confirmar_exclusao(self):
+        self.other_membership.delete()
+        response = self.client.post(self.leave_url, follow=True)
+        self.assertTrue(Group.objects.filter(pk=self.group.pk).exists())
+        self.assertTrue(GroupMembership.objects.filter(pk=self.creator_membership.pk).exists())
+        self.assertContains(response, 'name="confirm_delete"')
+        self.assertContains(response, 'O grupo e todas as despesas serão excluídos permanentemente. Deseja confirmar?')
+        self.assertNotContains(response, 'type="checkbox"')
+
+    def test_unico_membro_pode_sair_excluindo_grupo_e_despesas(self):
+        self.other_membership.delete()
+        expense = Expense.objects.create(
+            group=self.group, paid_by=self.creator, created_by=self.creator,
+            title='Compra', amount=Decimal('10.00'), date=date(2026, 11, 19),
+        )
+        split = ExpenseSplit.objects.create(
+            expense=expense, user=self.creator, amount_owed=Decimal('10.00'),
+        )
+        response = self.client.post(self.leave_url, {'confirm_delete': 'yes'})
+        self.assertRedirects(response, reverse('group_list'))
+        self.assertFalse(Group.objects.filter(pk=self.group.pk).exists())
+        self.assertFalse(GroupMembership.objects.filter(group_id=self.group.pk).exists())
+        self.assertFalse(Expense.objects.filter(pk=expense.pk).exists())
+        self.assertFalse(ExpenseSplit.objects.filter(pk=split.pk).exists())
+        self.assertTrue(CustomUser.objects.filter(pk=self.creator.pk).exists())
+
+    def test_vinculo_pendente_impede_exclusao_do_grupo(self):
+        self.other_membership.is_accepted = False
+        self.other_membership.save()
+        response = self.client.post(self.leave_url, {'confirm_delete': 'yes'}, follow=True)
+        self.assertTrue(Group.objects.filter(pk=self.group.pk).exists())
+        self.assertEqual(GroupMembership.objects.filter(group=self.group).count(), 2)
+        self.assertContains(response, 'alert alert-warning')
+        self.assertNotContains(response, 'name="confirm_delete"')
+
+    def test_get_nao_exclui_grupo_com_unico_membro(self):
+        self.other_membership.delete()
+        response = self.client.get(self.leave_url, {'confirm_delete': 'yes'})
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(Group.objects.filter(pk=self.group.pk).exists())
+
+    def test_exclusao_exige_csrf(self):
+        self.other_membership.delete()
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.creator)
+        response = client.post(self.leave_url, {'confirm_delete': 'yes'})
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Group.objects.filter(pk=self.group.pk).exists())
+
+    def test_ultimo_administrador_nao_pode_ser_removido_ou_rebaixado(self):
+        for action in ('kick', 'demote'):
+            with self.subTest(action=action):
+                self.client.post(self.action_url, {'action': action})
+                self.creator_membership.refresh_from_db()
+                self.assertTrue(self.creator_membership.is_group_admin)
+                self.assertTrue(self.creator_membership.is_accepted)
+
+    def test_criador_pode_ser_rebaixado_com_outro_administrador(self):
+        self.add_other_admin()
+        self.client.force_login(self.other)
+        self.client.post(self.action_url, {'action': 'demote'})
+        self.creator_membership.refresh_from_db()
+        self.assertFalse(self.creator_membership.is_group_admin)
+        self.group.save()
+        self.creator_membership.refresh_from_db()
+        self.assertFalse(self.creator_membership.is_group_admin)
+
+    def test_atualizar_grupo_nao_readiciona_criador_que_saiu(self):
+        self.add_other_admin()
+        self.client.post(self.leave_url)
+        self.group.description = 'Descrição atualizada'
+        self.group.save()
+        self.assertFalse(GroupMembership.objects.filter(group=self.group, user=self.creator).exists())
+
+    def test_get_nao_executa_operacoes(self):
+        self.add_other_admin()
+        response = self.client.get(self.leave_url)
+        self.assertEqual(response.status_code, 405)
+        for action in ('accept', 'promote', 'demote', 'kick'):
+            with self.subTest(action=action):
+                response = self.client.get(self.action_url, {'action': action})
+                self.assertEqual(response.status_code, 405)
+                self.creator_membership.refresh_from_db()
+                self.assertTrue(self.creator_membership.is_group_admin)
+                self.assertTrue(self.creator_membership.is_accepted)
+
+    def test_criador_sem_cargo_nao_pode_administrar(self):
+        self.add_other_admin()
+        self.creator_membership.is_group_admin = False
+        self.creator_membership.save()
+        self.client.post(self.action_url, {'action': 'promote'})
+        self.creator_membership.refresh_from_db()
+        self.assertFalse(self.creator_membership.is_group_admin)
+
+    def test_interface_permite_sair_e_alterar_cargo_do_criador(self):
+        response = self.client.get(reverse('group_detail', args=[self.group.pk]))
+        self.assertContains(response, 'Sair do Grupo')
+        self.add_other_admin()
+        self.client.force_login(self.other)
+        response = self.client.get(reverse('group_detail', args=[self.group.pk]))
+        self.assertContains(response, 'value="demote"')
+        self.assertContains(response, 'value="kick"')

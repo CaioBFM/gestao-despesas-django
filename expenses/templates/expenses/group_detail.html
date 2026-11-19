@@ -170,17 +170,13 @@
                                 
                                 {% if m.is_accepted %}
                                     {% if m.is_group_admin %}
-                                        {% if m.user != group.created_by %}
-                                            <button type="submit" name="action" value="demote" class="btn btn-sm btn-outline-secondary" title="Remover cargo de Admin"><i class="fas fa-user-shield"></i> <i class="fas fa-minus small"></i></button>
-                                        {% endif %}
+                                        <button type="submit" name="action" value="demote" class="btn btn-sm btn-outline-secondary" title="Remover cargo de Admin"><i class="fas fa-user-shield"></i> <i class="fas fa-minus small"></i></button>
                                     {% else %}
                                         <button type="submit" name="action" value="promote" class="btn btn-sm btn-outline-dark" title="Tornar Admin"><i class="fas fa-shield-alt"></i></button>
                                     {% endif %}
                                 {% endif %}
 
-                                {% if m.user != group.created_by %}
-                                    <button type="submit" name="action" value="kick" class="btn btn-sm btn-danger" title="Expulsar"><i class="fas fa-user-times"></i></button>
-                                {% endif %}
+                                <button type="submit" name="action" value="kick" class="btn btn-sm btn-danger" title="Expulsar"><i class="fas fa-user-times"></i></button>
                             </form>
                         {% endif %}
                     </td>
@@ -191,10 +187,24 @@
     </div>
 </div>
 
+{% if leave_blocked %}
+<div class="alert alert-warning" role="alert">
+    Você é o último administrador deste grupo. Promova outro participante a administrador antes de sair.
+</div>
+{% endif %}
+
 <div class="d-flex justify-content-between">
     <a href="{% url 'group_list' %}" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Voltar aos Grupos</a>
-    {% if request.user != group.created_by %}
-        <a href="{% url 'group_leave' group.pk %}" class="btn btn-outline-danger" onclick="return confirm('Deseja realmente sair deste grupo?');"><i class="fas fa-sign-out-alt me-1"></i> Sair do Grupo</a>
-    {% endif %}
+
+    <form method="post" action="{% url 'group_leave' group.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-danger"
+                {% if is_only_member %}name="confirm_delete" value="yes"{% endif %}
+                {% if leave_blocked %}disabled{% endif %}
+                onclick="return confirm('{% if is_only_member %}O grupo e todas as despesas serão excluídos permanentemente. Deseja confirmar?{% else %}Deseja realmente sair deste grupo?{% endif %}');">
+            <i class="fas fa-sign-out-alt me-1"></i> {% if is_only_member %}Excluir Grupo e Sair{% else %}Sair do Grupo{% endif %}
+        </button>
+    </form>
+
 </div>
 {% endblock %}

@@ -1,5 +1,6 @@
 from decimal import Decimal, InvalidOperation
 from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
@@ -17,6 +18,16 @@ def _is_group_admin_or_superuser(user, group, membership=None):
     if membership is None:
         membership = _get_accepted_membership(user, group)
     return bool(membership and membership.is_group_admin)
+
+
+def _is_last_group_admin(membership):
+    return (
+        membership.is_accepted
+        and membership.is_group_admin
+        and not GroupMembership.objects.filter(
+            group=membership.group, is_accepted=True, is_group_admin=True,
+        ).exclude(pk=membership.pk).exists()
+    )
 
 
 def _can_manage_expense(user, expense, group, membership=None):
@@ -123,7 +134,7 @@ def group_detail(request, pk):
         messages.error(request, 'Você não tem permissão para acessar este grupo.')
         return redirect('group_list')
 
-    user_is_group_admin = _is_group_admin_or_superuser(request.user, group, membership)
+    user_is_group_admin = bool(membership and membership.is_accepted and membership.is_group_admin)
 
     if request.method == 'POST' and user_is_group_admin:
         action = request.POST.get('action')
@@ -140,6 +151,8 @@ def group_detail(request, pk):
             return redirect('group_detail', pk=group.pk)
 
     members = GroupMembership.objects.filter(group=group).select_related('user')
+    is_only_member = bool(membership and not members.exclude(pk=membership.pk).exists())
+    leave_blocked = bool(membership and not is_only_member and _is_last_group_admin(membership))
 
     expenses_qs = (
         group.expenses
@@ -174,6 +187,8 @@ def group_detail(request, pk):
         'group': group,
         'members': members,
         'is_admin': user_is_group_admin,
+        'is_only_member': is_only_member,
+        'leave_blocked': leave_blocked,
         'expense_items': expense_items,
         'total_group_amount': total_group_amount,
         'total_to_pay_by_user': total_to_pay_by_user,
@@ -181,11 +196,12 @@ def group_detail(request, pk):
 
 
 @login_required
+@require_POST
 def member_action(request, group_id, membership_id):
     group = get_object_or_404(Group, pk=group_id)
     user_membership = _get_accepted_membership(request.user, group)
 
-    if not _is_group_admin_or_superuser(request.user, group, user_membership):
+    if not (user_membership and user_membership.is_accepted and user_membership.is_group_admin):
         messages.error(request, 'Ação restrita aos administradores do grupo.')
         return redirect('group_detail', pk=group.pk)
 
@@ -201,15 +217,15 @@ def member_action(request, group_id, membership_id):
         target_membership.save()
         messages.success(request, f'Membro {target_membership.user.username} promovido a administrador.')
     elif action == 'demote':
-        if target_membership.user == group.created_by:
-            messages.error(request, 'O criador do grupo não pode deixar de ser administrador.')
+        if _is_last_group_admin(target_membership):
+            messages.error(request, 'O último administrador não pode perder o cargo.')
         else:
             target_membership.is_group_admin = False
             target_membership.save()
             messages.success(request, f'Membro {target_membership.user.username} rebaixado a usuário comum.')
     elif action == 'kick':
-        if target_membership.user == group.created_by:
-            messages.error(request, 'O criador do grupo não pode ser removido.')
+        if _is_last_group_admin(target_membership):
+            messages.error(request, 'O último administrador não pode ser removido.')
         else:
             target_membership.delete()
             messages.success(request, 'Membro removido do grupo.')
@@ -218,12 +234,23 @@ def member_action(request, group_id, membership_id):
 
 
 @login_required
+@require_POST
+@transaction.atomic
 def group_leave(request, pk):
-    group = get_object_or_404(Group, pk=pk)
+    group = get_object_or_404(Group.objects.select_for_update(), pk=pk)
     membership = get_object_or_404(GroupMembership, user=request.user, group=group)
 
-    if request.user == group.created_by:
-        messages.error(request, 'O criador não pode sair do próprio grupo.')
+    if not GroupMembership.objects.filter(group=group).exclude(pk=membership.pk).exists():
+        if request.POST.get('confirm_delete') != 'yes':
+            messages.warning(request, 'Confirme a exclusão permanente do grupo e de todas as despesas para sair.')
+            return redirect('group_detail', pk=group.pk)
+        group.delete()
+        messages.success(request, 'Você saiu do grupo. O grupo e todos os dados associados foram excluídos permanentemente.')
+        return redirect('group_list')
+
+    if _is_last_group_admin(membership):
+        messages.warning(request, 'Você é o último administrador deste grupo. Promova outro participante a administrador antes de sair.')
+        return redirect('group_detail', pk=group.pk)
     else:
         membership.delete()
         messages.success(request, 'Você saiu do grupo com sucesso.')
