@@ -1,0 +1,100 @@
+{% extends 'app_base.html' %}
+{% load static %}
+{% block titulo %}{{ group.name }} - SplitExpenses{% endblock %}
+{% block pagina_titulo %}Grupos{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}">{% endblock %}
+{% block conteudo %}
+<a href="{% url 'group_list' %}" class="se-detail-back"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Voltar aos grupos</a>
+<header class="se-groups-heading se-detail-heading">
+    <div><h1>{{ group.name }}</h1><p>{{ group.description|default:'Grupo compartilhado' }}</p></div>
+    <div class="se-invite-code">
+        <label for="group-invite-code">Código de convite</label>
+        <div><input id="group-invite-code" value="{{ group.invite_code }}" readonly aria-label="Código de convite"><button type="button" class="se-groups-button se-groups-button-secondary" id="copy-invite" aria-label="Copiar código de convite"><i class="fa-regular fa-copy" aria-hidden="true"></i> Copiar</button></div>
+        <small id="copy-feedback" role="status"></small>
+    </div>
+</header>
+{% include 'expenses/group_messages.html' %}
+
+<div class="se-detail-summary">
+    <article class="se-groups-panel se-detail-balance"><span class="se-detail-icon"><i class="fa-solid fa-receipt" aria-hidden="true"></i></span><div><p>Total em despesas do grupo</p><strong>R$ {{ total_group_amount|floatformat:2 }}</strong></div></article>
+    <article class="se-groups-panel se-detail-balance se-detail-due"><span class="se-detail-icon"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></span><div><p>Seu total pendente a pagar</p><strong>R$ {{ total_to_pay_by_user|floatformat:2 }}</strong></div></article>
+</div>
+
+<section class="se-groups-panel se-detail-panel" aria-labelledby="balance-title">
+    <div class="se-detail-panel-heading"><h2 id="balance-title">Seu balanço no grupo</h2></div>
+    <ul class="se-participant-balances">
+        {% for balance in participant_balances %}
+        <li class="se-participant-balance{% if balance.direction == 'DEVE' %} se-balance-owed{% elif balance.direction == 'RECEBE' %} se-balance-receivable{% endif %}">
+            {% if balance.direction == 'DEVE' %}Você deve <strong>R$ {{ balance.net_amount|floatformat:'2g' }}</strong> a <strong>{{ balance.participant.get_full_name|default:balance.participant.username }}</strong>
+            {% elif balance.direction == 'RECEBE' %}<strong>{{ balance.participant.get_full_name|default:balance.participant.username }}</strong> te deve <strong>R$ {{ balance.net_amount|floatformat:'2g' }}</strong>
+            {% else %}Você e <strong>{{ balance.participant.get_full_name|default:balance.participant.username }}</strong> estão em dia{% endif %}
+        </li>
+        {% empty %}<li class="se-participant-balance">Você não possui pendências neste grupo.</li>{% endfor %}
+    </ul>
+</section>
+
+<section class="se-groups-panel se-detail-panel" aria-labelledby="expenses-title">
+    <div class="se-detail-panel-heading"><h2 id="expenses-title">Despesas do grupo</h2><a href="{% url 'expense_create' group.pk %}" class="se-groups-button se-groups-button-primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Nova despesa</a></div>
+    <div class="se-detail-table-wrap"><table class="se-detail-table">
+        <thead><tr><th>Título</th><th>Data</th><th>Pago por</th><th>Valor total</th><th>Sua participação</th><th>Pagamento</th><th>Ações</th></tr></thead>
+        <tbody>
+        {% for item in expense_items %}
+        <tr>
+            <td><strong>{{ item.expense.title }}</strong>{% if item.expense.description %}<small>{{ item.expense.description|truncatechars:60 }}</small>{% endif %}</td>
+            <td>{{ item.expense.date|date:'d/m/Y' }}</td><td>{{ item.expense.paid_by.username }}</td><td><strong>R$ {{ item.expense.amount|floatformat:2 }}</strong></td>
+            <td>{% if item.user_status == 'Paga' %}<span class="se-detail-badge se-detail-success">Paga (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>{% elif item.user_status == 'A pagar' %}<span class="se-detail-badge se-detail-warning">A pagar (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>{% elif item.user_status == 'Cota própria' %}<span class="se-detail-badge se-detail-info">Cota própria (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>{% else %}<span class="se-detail-badge">Não participa</span>{% endif %}</td>
+            <td>{{ item.paid_splits_count }}/{{ item.total_splits_count }} pagas</td>
+            <td><div class="se-detail-actions"><a href="{% url 'expense_detail' item.expense.pk %}" class="se-detail-action">Ver</a>{% if item.can_manage %}<a href="{% url 'expense_update' item.expense.pk %}" class="se-detail-action" aria-label="Editar {{ item.expense.title }}" title="Editar"><i class="fa-solid fa-pen" aria-hidden="true"></i></a><a href="{% url 'expense_delete' item.expense.pk %}" class="se-detail-action se-detail-danger" aria-label="Excluir {{ item.expense.title }}" title="Excluir"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>{% endif %}</div></td>
+        </tr>
+        {% empty %}<tr><td colspan="7" class="se-detail-empty">Nenhuma despesa cadastrada neste grupo ainda.</td></tr>{% endfor %}
+        </tbody>
+    </table></div>
+</section>
+
+<section class="se-groups-panel se-detail-panel" aria-labelledby="members-title">
+    <div class="se-detail-panel-heading"><h2 id="members-title">Participantes</h2></div>
+    <div class="se-detail-table-wrap"><table class="se-detail-table">
+        <thead><tr><th>Usuário</th><th>E-mail</th><th>Status</th><th>Perfil</th><th>Ações</th></tr></thead>
+        <tbody>{% for m in members %}
+        <tr>
+            <td><strong>{{ m.user.username }}</strong> {% if m.user == group.created_by %}<span class="se-detail-badge">Criador</span>{% endif %}</td>
+            <td>{{ m.user.email }}</td><td>{% if m.is_accepted %}<span class="se-detail-badge se-detail-success">Aceito</span>{% else %}<span class="se-detail-badge se-detail-warning">Pendente</span>{% endif %}</td>
+            <td>{% if m.is_group_admin %}<span class="se-detail-badge se-detail-info">Admin do grupo</span>{% else %}<span class="se-detail-badge">Membro</span>{% endif %}</td>
+            <td>{% if is_admin and m.user != request.user %}
+                <form method="post" action="{% url 'member_action' group.pk m.pk %}" class="se-detail-actions">{% csrf_token %}
+                    {% if not m.is_accepted %}<button type="submit" name="action" value="accept" class="se-detail-action" title="Aceitar" aria-label="Aceitar {{ m.user.username }}"><i class="fa-solid fa-check" aria-hidden="true"></i></button>{% endif %}
+                    {% if m.is_accepted %}{% if m.is_group_admin %}<button type="submit" name="action" value="demote" class="se-detail-action" title="Remover cargo de admin" aria-label="Remover cargo de admin de {{ m.user.username }}"><i class="fa-solid fa-user-minus" aria-hidden="true"></i></button>{% else %}<button type="submit" name="action" value="promote" class="se-detail-action" title="Tornar admin" aria-label="Tornar {{ m.user.username }} administrador"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></button>{% endif %}{% endif %}
+                    <button type="submit" name="action" value="kick" class="se-detail-action se-detail-danger" title="Expulsar" aria-label="Expulsar {{ m.user.username }}"><i class="fa-solid fa-user-xmark" aria-hidden="true"></i></button>
+                </form>{% endif %}</td>
+        </tr>{% endfor %}</tbody>
+    </table></div>
+</section>
+
+{% if is_admin %}
+<section class="se-groups-panel se-detail-panel se-detail-admin" aria-labelledby="admin-title">
+    <h2 id="admin-title">Administração do grupo</h2>
+    <form method="post" class="se-detail-admin-form">{% csrf_token %}<input type="hidden" name="action" value="update_info">
+        <div class="se-group-field"><label for="group-description">Descrição</label><input id="group-description" type="text" name="description" class="form-control" value="{{ group.description|default_if_none:'' }}"></div>
+        <div class="se-group-field"><label for="group-code">Alterar código de convite</label><input id="group-code" type="text" name="invite_code" class="form-control" value="{{ group.invite_code }}"></div>
+        <button type="submit" class="se-groups-button se-groups-button-secondary">Salvar alterações do grupo</button>
+    </form>
+</section>
+{% endif %}
+{% if leave_blocked %}<div class="alert alert-warning" role="alert">Você é o último administrador deste grupo. Promova outro participante a administrador antes de sair.</div>{% endif %}
+<form method="post" action="{% url 'group_leave' group.pk %}" class="se-detail-leave">{% csrf_token %}
+    <button type="submit" class="se-groups-button se-groups-button-secondary se-detail-danger" {% if is_only_member %}name="confirm_delete" value="yes"{% endif %} {% if leave_blocked %}disabled{% endif %} onclick="return confirm('{% if is_only_member %}O grupo e todas as despesas serão excluídos permanentemente. Deseja confirmar?{% else %}Deseja realmente sair deste grupo?{% endif %}');"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> {% if is_only_member %}Excluir Grupo e Sair{% else %}Sair do Grupo{% endif %}</button>
+</form>
+<script>
+    document.getElementById('copy-invite').addEventListener('click', async function () {
+        const code = document.getElementById('group-invite-code');
+        const feedback = document.getElementById('copy-feedback');
+        try {
+            await navigator.clipboard.writeText(code.value);
+            feedback.textContent = 'Código copiado.';
+        } catch (_) {
+            code.select();
+            feedback.textContent = 'Selecione e copie o código de convite.';
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends 'app_base.html' %}
+{% load static %}
+{% block titulo %}Meus grupos - SplitExpenses{% endblock %}
+{% block pagina_titulo %}Grupos{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}">{% endblock %}
+{% block conteudo %}
+<header class="se-groups-heading">
+    <div><h1>Meus grupos</h1><p>Organize despesas por ocasião ou convivência.</p></div>
+    <a href="{% url 'group_create' %}" class="se-groups-button se-groups-button-primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Criar grupo</a>
+</header>
+{% include 'expenses/group_messages.html' %}
+<section class="se-groups-panel se-join-panel" aria-labelledby="join-title">
+    <div><h2 id="join-title">Participar de um grupo</h2><p>Informe o código de convite enviado por um participante.</p></div>
+    <form method="post" action="{% url 'group_join' %}" class="se-join-form">
+        {% csrf_token %}
+        <label for="{{ join_form.invite_code.id_for_label }}" class="visually-hidden">Código de convite</label>
+        {{ join_form.invite_code }}
+        <button type="submit" class="se-groups-button se-groups-button-secondary"><i class="fa-solid fa-key" aria-hidden="true"></i> Participar</button>
+    </form>
+</section>
+<section class="se-groups-grid" aria-label="Meus grupos">
+    {% for group in groups %}
+    <a href="{% url 'group_detail' group.pk %}" class="se-groups-panel se-group-card">
+        <span class="se-group-icon" aria-hidden="true"><i class="fa-solid fa-users"></i></span>
+        <h2>{{ group.name }}</h2>
+        <p class="se-group-description">{{ group.description|default:'Sem descrição informada.' }}</p>
+        <p class="se-group-code">Código de convite <strong>{{ group.invite_code }}</strong></p>
+        <span class="se-group-link">Acessar grupo <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
+    {% empty %}
+    <div class="se-groups-panel se-groups-empty"><i class="fa-regular fa-folder-open" aria-hidden="true"></i><p>Você ainda não participa de nenhum grupo ativo.</p></div>
+    {% endfor %}
+</section>
+{% endblock %}

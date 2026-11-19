@@ -169,3 +169,6 @@ JAZZMIN_SETTINGS = {
         ]
     },
 }
+
+LOGIN_REDIRECT_URL = "inicio"
+LOGIN_URL = "login"

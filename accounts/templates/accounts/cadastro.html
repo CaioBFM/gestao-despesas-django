@@ -1,0 +1,50 @@
+
+{% extends "accounts/auth_base.html" %}
+
+{% block titulo %}Cadastro — SplitExpenses{% endblock %}
+
+{% block auth_content %}
+<div class="se-auth-form-panel se-register-panel">
+  <div class="se-auth-heading">
+    <span class="se-auth-eyebrow">COMECE POR AQUI</span>
+    <h1>Criar conta</h1>
+    <p>Preencha seus dados para começar.</p>
+  </div>
+
+  <form method="post" action="{% url 'cadastro' %}" class="se-login-form">
+    {% csrf_token %}
+
+    {% for error in form.non_field_errors %}
+      <div class="se-auth-alert" role="alert">{{ error }}</div>
+    {% endfor %}
+
+    <div class="se-register-grid">
+      {% for field in form %}
+        <div class="se-auth-field {% if field.name != 'first_name' and field.name != 'last_name' %}se-register-field-wide{% endif %}">
+          <label for="{{ field.id_for_label }}">
+            {{ field.label }}
+            {% if field.field.required %}
+              <span class="se-required">*</span>
+            {% endif %}
+          </label>
+
+          {{ field }}
+
+          {% for error in field.errors %}
+            <small class="se-field-error">{{ error }}</small>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <button type="submit" class="se-btn-primary">
+      Criar conta
+    </button>
+
+    <p class="se-auth-switch">
+      Já tem uma conta?
+      <a href="{% url 'login' %}">Entrar</a>
+    </p>
+  </form>
+</div>
+{% endblock %}

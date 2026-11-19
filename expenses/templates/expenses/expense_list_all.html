@@ -1,0 +1,21 @@
+{% extends 'app_base.html' %}
+{% load static %}
+{% block titulo %}Despesas - SplitExpenses{% endblock %}
+{% block pagina_titulo %}Despesas{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}"><link rel="stylesheet" href="{% static 'css/expenses.css' %}">{% endblock %}
+{% block conteudo %}
+<header class="se-groups-heading"><div><h1>Despesas</h1><p>Acompanhe as despesas dos seus grupos.</p></div></header>
+{% include 'expenses/group_messages.html' %}
+<section class="se-groups-panel se-detail-panel" aria-label="Despesas dos meus grupos">
+    <div class="se-detail-table-wrap"><table class="se-detail-table">
+        <thead><tr><th>Despesa</th><th>Grupo</th><th>Data</th><th>Pago por</th><th>Valor total</th><th>Seu status</th><th>Ações</th></tr></thead>
+        <tbody>{% for item in expense_items %}<tr>
+            <td><strong>{{ item.expense.title }}</strong></td>
+            <td><a class="se-expense-link" href="{% url 'group_detail' item.expense.group.pk %}">{{ item.expense.group.name }}</a></td>
+            <td>{{ item.expense.date|date:'d/m/Y' }}</td><td>{{ item.expense.paid_by.username }}</td><td>R$ {{ item.expense.amount|floatformat:2 }}</td>
+            <td>{% if item.user_status == 'Paga' %}<span class="se-detail-badge se-detail-success">Paga (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>{% elif item.user_status == 'A pagar' %}<span class="se-detail-badge se-detail-warning">A pagar (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>{% elif item.user_status == 'Cota própria' %}<span class="se-detail-badge se-detail-info">Cota própria (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>{% else %}<span class="se-detail-badge">Não participa</span>{% endif %}</td>
+            <td><a href="{% url 'expense_detail' item.expense.pk %}" class="se-detail-action">Detalhes</a></td>
+        </tr>{% empty %}<tr><td colspan="7" class="se-detail-empty">Nenhuma despesa encontrada nos seus grupos.</td></tr>{% endfor %}</tbody>
+    </table></div>
+</section>
+{% endblock %}

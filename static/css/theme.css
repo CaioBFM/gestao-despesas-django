@@ -1,0 +1,53 @@
+
+/* SplitExpenses — Design Tokens */
+
+/* Tema claro */
+:root,
+[data-bs-theme="light"] {
+    --se-bg: #F8F6F2;
+    --se-surface: #FFFDF9;
+    --se-surface-2: #F4F1EC;
+
+    --se-primary: #4F7CAC;
+    --se-primary-hover: #3F6A96;
+    --se-primary-soft: #E7F0F8;
+
+    --se-gold: #C9A66B;
+
+    --se-text: #243447;
+    --se-muted: #5E6B78;
+
+    --se-success: #6FA67A;
+    --se-success-soft: #EDF5ED;
+
+    --se-danger: #C96A6A;
+    --se-danger-soft: #FAEEEE;
+
+    --se-border: #E7DFD4;
+    --se-shadow: 0 8px 30px rgba(36, 52, 71, 0.05);
+}
+
+/* Tema escuro */
+[data-bs-theme="dark"] {
+    --se-bg: #1E2730;
+    --se-surface: #263341;
+    --se-surface-2: #202C37;
+
+    --se-primary: #7DA2C8;
+    --se-primary-hover: #91B2D2;
+    --se-primary-soft: #2F4356;
+
+    --se-gold: #D2B07A;
+
+    --se-text: #F3F5F7;
+    --se-muted: #B8C2CC;
+
+    --se-success: #88C098;
+    --se-success-soft: #2C4438;
+
+    --se-danger: #E28C8C;
+    --se-danger-soft: #4C3538;
+
+    --se-border: #36424F;
+    --se-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}

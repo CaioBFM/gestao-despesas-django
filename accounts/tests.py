@@ -151,3 +151,86 @@ class AdminAccessTests(TestCase):
         self.client.force_login(staff)
         response = self.client.get('/admin/accounts/customuser/')
         self.assertEqual(response.status_code, 403)
+
+class AuthenticationFlowTests(TestCase):
+
+    def setUp(self):
+        self.usuario = CustomUser.objects.create_user(
+            username="usuario_teste",
+            password="SenhaSegura123!",
+            role="USER",
+        )
+
+    def test_cadastro_usuario_comum(self):
+        response = self.client.post("/cadastro/", {
+            "username": "novo_usuario",
+            "first_name": "Novo",
+            "last_name": "Usuario",
+            "email": "novo@exemplo.com",
+            "password1": "SenhaSegura123!",
+            "password2": "SenhaSegura123!",
+        })
+
+        self.assertRedirects(response, "/login/")
+
+        user = CustomUser.objects.get(username="novo_usuario")
+        self.assertTrue(user.check_password("SenhaSegura123!"))
+        self.assertEqual(user.role, "USER")
+        self.assertFalse(user.is_staff)
+        self.assertFalse(user.is_superuser)
+
+    def test_cadastro_rejeita_senhas_diferentes(self):
+        response = self.client.post("/cadastro/", {
+            "username": "novo_usuario",
+            "email": "novo@exemplo.com",
+            "password1": "SenhaSegura123!",
+            "password2": "OutraSenha123!",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            CustomUser.objects.filter(username="novo_usuario").exists()
+        )
+
+    def test_login_valido(self):
+        response = self.client.post("/login/", {
+            "username": "usuario_teste",
+            "password": "SenhaSegura123!",
+        })
+
+        self.assertRedirects(response, "/")
+        self.assertIn("_auth_user_id", self.client.session)
+
+    def test_login_invalido(self):
+        response = self.client.post("/login/", {
+            "username": "usuario_teste",
+            "password": "senha_errada",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_logout(self):
+        self.client.force_login(self.usuario)
+
+        response = self.client.post("/logout/")
+
+        self.assertRedirects(response, "/login/")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_pagina_inicial_exige_login(self):
+        response = self.client.get("/")
+
+        self.assertRedirects(response, "/login/?next=/")
+
+        self.client.force_login(self.usuario)
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_usuario_autenticado_nao_acessa_cadastro(self):
+        self.client.force_login(self.usuario)
+
+        response = self.client.get("/cadastro/")
+
+        self.assertRedirects(response, "/")

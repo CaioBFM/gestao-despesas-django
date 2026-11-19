@@ -1,0 +1,28 @@
+{% extends 'app_base.html' %}
+{% load static %}
+{% block titulo %}Meu perfil - SplitExpenses{% endblock %}
+{% block pagina_titulo %}Meu perfil{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}">{% endblock %}
+{% block conteudo %}
+<header class="se-groups-heading"><div><h1>Meu perfil</h1><p>Atualize suas informações pessoais.</p></div></header>
+{% include 'expenses/group_messages.html' %}
+<section class="se-groups-panel se-group-form-panel" aria-labelledby="profile-title">
+    <h2 id="profile-title" class="se-profile-title">Informações pessoais</h2>
+    <form method="post" class="se-group-form">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {% for field in form %}
+        <div class="se-group-field">
+            <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+            {{ field }}
+            {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+            {{ field.errors }}
+        </div>
+        {% endfor %}
+        <div class="se-group-actions">
+            <a href="{% url 'inicio' %}" class="se-groups-button se-groups-button-secondary">Voltar ao início</a>
+            <button type="submit" class="se-groups-button se-groups-button-primary">Salvar alterações</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

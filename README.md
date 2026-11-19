@@ -1,114 +1,194 @@
-# Gestão de Despesas Django
-
 ## Descrição do Projeto
 
-O projeto propõe facilitar o controle de despesas compartilhadas entre grupos, inspirado em ferramentas como o Splitwise. No Checkpoint 1, o foco implementado está na modelagem relacional e na administração dos dados pelo Django Admin. As interfaces de usuário final e os fluxos completos de participação e divisão de despesas permanecem planejados para etapas posteriores.
+O SplitExpenses é uma aplicação web para organizar despesas compartilhadas. Usuários podem criar grupos, convidar participantes, dividir despesas, acompanhar pagamentos, adicionar amigos pelo username e consultar seu histórico pessoal. O projeto foi desenvolvido com Django e arquitetura MVT, autenticação de usuários e persistência em banco de dados relacional.
 
 ---
+
 ## Integrantes do Projeto
 
 | INTEGRANTE | GITHUB |
 | --- | --- |
-| Gustavo Alessandro de Souza Sabino | [https://github.com/GUSTAVO-ALESSANDRO](https://github.com/GUSTAVO-ALESSANDRO) |
-| Diego Alves de Oliveira | [https://github.com/diego-codev](https://github.com/diego-codev) |
-| Caio Bueno Finocchio Martins | [https://github.com/caiobfm](https://github.com/caiobfm) |
+| Gustavo Alessandro de Souza Sabino | [GUSTAVO-ALESSANDRO](https://github.com/GUSTAVO-ALESSANDRO) |
+| Diego Alves de Oliveira | [diego-codev](https://github.com/diego-codev) |
+| Caio Bueno Finocchio Martins | [caiobfm](https://github.com/caiobfm) |
 
 ---
 
 ## Tecnologias Utilizadas
 
-O projeto foi construído utilizando a linguagem Python em conjunto com o framework Django, que fornece a arquitetura MVT, o sistema robusto de autenticação, o mapeamento objeto-relacional e a modularidade necessária para separar a aplicação em componentes reutilizáveis, garantindo organização e escalabilidade ao código-fonte.
+- **Python 3 e Django 6.1.1:** aplicação web, arquitetura MVT, autenticação, formulários e ORM.
+- **PostgreSQL:** banco de dados relacional.
+- **Jazzmin:** personalização do Django Admin.
+- **Bootstrap 5, CSS e JavaScript:** interface responsiva, componentes e temas claro/escuro.
+- **WhiteNoise:** publicação de arquivos estáticos.
+- **Git e GitHub:** controle de versão e colaboração.
 
-Para o armazenamento persistente dos dados, o sistema emprega o banco de dados relacional PostgreSQL, assegurando a integridade referencial por meio de chaves estrangeiras, restrições e transações seguras, enquanto a interface do usuário foi estilizada com o framework CSS Bootstrap, oferecendo uma experiência responsiva, moderna e compatível com temas claros e escuros.
-
-O controle de versão e a colaboração da equipe foram gerenciados através do Git e do GitHub, utilizando branches específicas para organização do fluxo de trabalho, e o painel administrativo do Django foi customizado com temas avançados para atender aos requisitos visuais e de filtragem propostos.
+O projeto possui dois aplicativos Django: `accounts`, para usuários e amizades, e `expenses`, para grupos e despesas.
 
 ---
 
 ## Instruções para Instalação
 
-Para executar o Checkpoint 1, tenha Python 3 e PostgreSQL disponíveis. Na raiz do repositório:
+Tenha Python, PostgreSQL e Git instalados. Os comandos abaixo são executados na raiz do repositório.
 
-1. Clone o repositório e entre na pasta:
+### 1. Clonar o repositório
 
 ```bash
 git clone https://github.com/GUSTAVO-ALESSANDRO/gestao-despesas-django.git
 cd gestao-despesas-django
 ```
 
-2. Crie e ative o ambiente virtual:
+### 2. Criar e ativar o ambiente virtual
 
 ```bash
-python3 -m venv venv
+python -m venv venv
+```
+
+Ative o ambiente:
+
+```powershell
+# Windows PowerShell
+.\venv\Scripts\Activate.ps1
+```
+
+```bash
+# Linux/macOS
 source venv/bin/activate
-
 ```
 
-3. Instale as dependências:
+Instale as dependências:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-4. Crie `.env` manualmente na raiz do projeto (não há `.env.example`). Preencha os valores abaixo; gere `SECRET_KEY` com `python3 -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`.
+### 3. Criar o banco PostgreSQL
+
+Crie um banco e usuário PostgreSQL. Exemplo no Linux:
 
 ```bash
-SECRET_KEY=chave-gerada
+sudo -u postgres createuser --pwprompt gestao_despesas
+sudo -u postgres createdb -O gestao_despesas gestao_despesas_db
+```
+
+No Windows, a criação pode ser feita pelo pgAdmin ou por `psql`.
+
+### 4. Configurar as variáveis de ambiente
+
+Copie `.env.example` para `.env`:
+
+```powershell
+# Windows PowerShell
+Copy-Item .env.example .env
+```
+
+```bash
+# Linux/macOS
+cp .env.example .env
+```
+
+Edite `.env` e configure o acesso ao banco:
+
+```ini
+SECRET_KEY=chave-secreta-gerada
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
-DB_NAME=nome_do_banco
-DB_USER=usuario_postgres
-DB_PASSWORD=senha_postgres
+DB_NAME=gestao_despesas_db
+DB_USER=gestao_despesas
+DB_PASSWORD=sua_senha
 DB_HOST=localhost
 DB_PORT=5432
-
 ```
 
-5. Crie o banco PostgreSQL indicado no `.env`, aplique as migrations e crie um administrador:
+Gere uma chave secreta para desenvolvimento, se necessário:
 
 ```bash
-createdb -h localhost -p 5432 -U usuario_postgres nome_do_banco
-python3 manage.py migrate
-python3 manage.py createsuperuser
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+Não publique o arquivo `.env`. Em produção, use `DEBUG=False`, uma chave secreta própria e configure `ALLOWED_HOSTS` e as opções de segurança do ambiente.
+
+### 5. Aplicar migrations e criar o administrador
+
+```bash
+python manage.py migrate
+python manage.py createsuperuser
 ```
 
 ---
 
 ## Instruções para Execução
 
-Após concluir a instalação e configurar o banco de dados, execute o servidor de desenvolvimento local com o seguinte comando:
+Com o PostgreSQL ativo e o ambiente virtual habilitado:
 
 ```bash
-python3 manage.py runserver
+python manage.py runserver
 ```
 
-Com o servidor em execução, abra o seu navegador de preferência e acesse o endereço `[http://127.0.0.1:8000/](http://127.0.0.1:8000/)` para interagir com a aplicação web.
+Acesse:
+
+- Aplicação: <http://127.0.0.1:8000/>
+- Django Admin: <http://127.0.0.1:8000/admin/>
+
+Para validar o projeto e executar a suíte de testes:
+
+```bash
+python manage.py check
+python manage.py test
+```
+
+Os testes utilizam o PostgreSQL configurado e precisam de permissão para criar o banco de testes.
 
 ### Dados de demonstração (opcional)
 
-`clear_and_populate.sql` corresponde às tabelas e relacionamentos atuais. **O script apaga todos os registros existentes e reinicia as sequências antes de inserir os dados de exemplo. Use somente em banco descartável de desenvolvimento/demonstração.** Execute depois de `migrate`; ele cria uma conta administrativa de demonstração (`admin` / `admin`), então não execute `createsuperuser` antes da população:
+O arquivo `clear_and_populate.sql` limpa as tabelas e insere dados de exemplo. Use somente em um banco descartável; o script apaga dados existentes. Execute depois de `migrate`:
 
 ```bash
-psql -h localhost -p 5432 -U usuario_postgres -d nome_do_banco -W -f clear_and_populate.sql
+psql -h localhost -p 5432 -U gestao_despesas -d gestao_despesas_db -W -v ON_ERROR_STOP=1 --single-transaction -f clear_and_populate.sql
 ```
+
+O usuário de demonstração `admin` tem senha `admin`; os demais usuários de exemplo têm senha `user`. Altere essas senhas antes de qualquer uso fora de desenvolvimento.
 
 ---
 
 ## Principais Funcionalidades
 
-### Implementado no Checkpoint 1
+### Acesso e contas
 
-* Dois apps Django (`accounts` e `expenses`), modelos relacionais e migrations para usuários, grupos, memberships, despesas e divisões.
-* Django Admin personalizado com Jazzmin. O acesso depende de `is_staff`, permissões Django e `is_superuser`; `role=ADMIN` não promove um usuário a superusuário.
-* Formulários de administração de usuários com senha armazenada por hash e redefinição pelo fluxo nativo do admin.
-* Inlines de memberships na página do grupo e divisões na página da despesa.
-* Filtros de usuários por perfil, status, participação em grupos e data; grupos por status, existência de despesas, quantidade de membros, criador e data; memberships por administrador, aceite e data; despesas por faixa de valor, situação das divisões, grupo, pagador e datas; divisões por quitação, faixa de valor, grupo e usuário. As listagens de memberships e divisões também têm seletores para restringir por grupo ou despesa.
-* Gráficos de cadastros de usuários, grupos e despesas por semana, mês e ano. Usam o queryset filtrado da respectiva listagem e contam cadastros; não representam histórico de mudanças de status.
-* Validações para o criador aceito e administrador do grupo, memberships sem duplicidade, pagador/cadastrador e participantes aceitos, e valores monetários positivos.
+- Cadastro, login e logout com autenticação por usuário e senha.
+- Edição de nome, sobrenome e e-mail do perfil.
+- Papéis de usuário comum e administrador. O acesso ao Admin também depende das permissões Django (`is_staff`, permissões e `is_superuser`); `role=ADMIN` não concede superusuário.
+- Tema claro/escuro e navegação responsiva.
 
-### Planejado para o Checkpoint 2
+### Grupos
 
-Cadastro, login e logout de usuários finais; páginas para gerenciar grupos e despesas; fluxos completos de convite e aprovação; divisão automática e atualização de quitação fora do admin.
+- Criar grupos; o criador é associado como membro aceito e administrador.
+- Código de convite gerado automaticamente para solicitar participação.
+- Aprovação de solicitações, promoção/rebaixamento de administradores e remoção de membros.
+- Administradores podem adicionar diretamente ao grupo um amigo com amizade aceita.
+- Regras para impedir saída/remoção com pendências financeiras e exclusão acidental do grupo.
+
+### Amigos
+
+- Enviar solicitações pelo username.
+- Aceitar, recusar ou cancelar solicitações.
+- Consultar e remover amizades.
+- Solicitações recíprocas aceitam a solicitação pendente existente.
+
+### Despesas e histórico
+
+- Criar, consultar, editar e excluir despesas de grupos, respeitando as permissões.
+- Dividir o valor por quantias ou porcentagens; o total das divisões deve corresponder ao valor da despesa.
+- Consultar participantes, balanços individuais e valores a pagar/receber.
+- Marcar divisões como pagas ou pendentes.
+- Histórico pessoal das despesas pagas diretamente pelo usuário, cotas quitadas e cotas ainda devidas, com filtro por situação.
+- O sistema registra pagamentos, mas não processa transferências financeiras.
+
+### Administração
+
+- Django Admin personalizado com Jazzmin em `/admin/`.
+- Administração de usuários, amizades, grupos, participações, despesas e divisões.
+- Filtros, buscas, formulários especializados e gráficos de cadastros nas listagens administrativas.
 
 ---
 
@@ -116,18 +196,20 @@ Cadastro, login e logout de usuários finais; páginas para gerenciar grupos e d
 
 ```mermaid
 erDiagram
+    USERS ||--o{ FRIENDSHIPS : "envia (from_user)"
+    USERS ||--o{ FRIENDSHIPS : "recebe (to_user)"
     USERS ||--o{ GROUPS : "cria (created_by)"
-    USERS ||--o{ GROUP_MEMBERSHIPS : "possui participações"
+    USERS ||--o{ GROUP_MEMBERSHIPS : "participa"
     GROUPS ||--o{ GROUP_MEMBERSHIPS : "contém membros"
-    GROUPS ||--o{ EXPENSES : "possui despesas"
+    GROUPS ||--o{ EXPENSES : "possui"
     USERS ||--o{ EXPENSES : "paga (paid_by)"
     USERS ||--o{ EXPENSES : "cadastra (created_by)"
-    EXPENSES ||--o{ EXPENSE_SPLITS : "divide em faturas"
-    USERS ||--o{ EXPENSE_SPLITS : "deve (user_id)"
+    EXPENSES ||--o{ EXPENSE_SPLITS : "divide"
+    USERS ||--o{ EXPENSE_SPLITS : "deve"
 
     USERS {
         bigint id PK
-        string username
+        string username UK
         string email
         string password
         string first_name
@@ -139,12 +221,21 @@ erDiagram
         timestamp created_at
     }
 
+    FRIENDSHIPS {
+        bigint id PK
+        bigint from_user_id FK
+        bigint to_user_id FK
+        string status "PENDING | ACCEPTED"
+        timestamp created_at
+        timestamp updated_at
+    }
+
     GROUPS {
         bigint id PK
         string name
         string description
-        string invite_code
-        bigint created_by FK
+        string invite_code UK
+        bigint created_by_id FK
         boolean is_active
         timestamp created_at
     }
@@ -161,8 +252,8 @@ erDiagram
     EXPENSES {
         bigint id PK
         bigint group_id FK
-        bigint paid_by FK
-        bigint created_by FK
+        bigint paid_by_id FK
+        bigint created_by_id FK
         string title
         string description
         decimal amount
@@ -177,82 +268,99 @@ erDiagram
         decimal amount_owed
         boolean is_paid
     }
-
 ```
+
+`GroupMembership` é único por grupo/usuário e `ExpenseSplit` é único por despesa/usuário. Amizades impedem relações consigo mesmo e têm status pendente ou aceito. Valores de despesas e divisões devem ser positivos. O pagador, o responsável pelo cadastro e os participantes das divisões precisam ser membros aceitos do grupo.
 
 ---
 
-`GroupMembership` tem unicidade para o par usuário/grupo; `ExpenseSplit`, para despesa/usuário. O criador é associado como membro aceito e administrador. Pagador e cadastrador da despesa, assim como participantes das divisões, devem ser membros aceitos do grupo. Valores de despesa e divisão precisam ser maiores que zero. A soma das divisões não é validada nesta etapa, pois elas são editadas individualmente.
+## Rotas Disponíveis
 
-## Rotas disponíveis
+As páginas de usuários finais exigem autenticação, exceto cadastro e login. Para operações de recursos, o projeto usa **GET para consultar**, **POST para criar**, **PUT para editar** e **DELETE para excluir**. Formulários HTML nativos só enviam GET/POST; a interface usa JavaScript `fetch` para enviar PUT/DELETE com o token CSRF.
 
 | MÉTODO | ROTA | Explicação | Permissão |
 | --- | --- | --- | --- |
-| **GET** | `/` | Página inicial atual. | Pública |
-| **GET** | `/admin/` | Django Admin com Jazzmin; acesso e operações dependem das permissões Django do usuário. | Usuário autenticado com acesso ao admin |
-
-As rotas de cadastro e autenticação de usuários finais, e as operações de grupos e despesas fora do admin, ainda não estão implementadas. Os dados do Checkpoint 1 são gerenciados pelo `/admin/`.
+| **GET** | `/` | Página inicial e resumo financeiro. | Usuário autenticado |
+| **GET, POST** | `/cadastro/` | Exibir e criar uma conta de usuário comum. | Público |
+| **GET, POST** | `/login/` | Exibir formulário e autenticar usuário. | Público |
+| **POST** | `/logout/` | Encerrar a sessão. | Usuário autenticado |
+| **GET, PUT** | `/perfil/` | Consultar e editar o perfil. | Usuário autenticado |
+| **GET, POST** | `/amigos/` | Listar amigos/solicitações e enviar pedido de amizade. | Usuário autenticado |
+| **PUT** | `/amigos/solicitacao/<friendship_id>/acao/` | Aceitar uma solicitação recebida (`action=accept`). | Destinatário |
+| **DELETE** | `/amigos/solicitacao/<friendship_id>/acao/` | Recusar ou cancelar solicitação (`action=decline`/`cancel`). | Destinatário/remetente |
+| **DELETE** | `/amigos/<user_id>/remover/` | Remover uma amizade aceita. | Usuário autenticado |
+| **GET** | `/groups/` | Listar os grupos do usuário. | Usuário autenticado |
+| **GET, POST** | `/groups/new/` | Exibir formulário e criar grupo. | Usuário autenticado |
+| **GET, PUT** | `/groups/<pk>/` | Consultar grupo ou editar suas informações (`action=update_info`). | Membro; edição por administrador |
+| **POST** | `/groups/join/` | Solicitar entrada usando código de convite. | Usuário autenticado |
+| **DELETE** | `/groups/<pk>/leave/` | Sair do grupo ou excluir o grupo quando for o único membro. | Membro |
+| **PUT, DELETE** | `/groups/<group_id>/members/<membership_id>/action/` | Aceitar/promover/rebaixar (`PUT`) ou remover membro (`DELETE`). | Administrador do grupo |
+| **POST** | `/groups/<pk>/add-friend/` | Adicionar amigo aceito ao grupo. | Administrador do grupo |
+| **GET, POST** | `/groups/<group_id>/expenses/new/` | Exibir formulário e criar despesa/divisões. | Membro aceito |
+| **GET** | `/groups/expenses/` | Listar despesas dos grupos do usuário. | Usuário autenticado |
+| **GET** | `/groups/expenses/<pk>/` | Consultar despesa e suas divisões. | Membro do grupo |
+| **GET, PUT** | `/groups/expenses/<pk>/edit/` | Exibir formulário e editar despesa/divisões. | Criador, pagador ou administrador |
+| **GET, DELETE** | `/groups/expenses/<pk>/delete/` | Exibir confirmação e excluir despesa. | Criador, pagador ou administrador |
+| **PUT** | `/groups/splits/<split_id>/toggle-paid/` | Atualizar o status de pagamento de uma divisão. | Usuário autorizado |
+| **GET** | `/groups/history/` | Consultar histórico; aceita `?status=pending` ou `?status=paid`. | Usuário autenticado |
+| **GET** | `/admin/` | Painel administrativo Jazzmin. | Usuário autenticado com permissões Django |
 
 ---
 
 ## Estrutura do Projeto
-
-A arquitetura do projeto segue a modularidade recomendada pelo Django, separando as responsabilidades principais entre o núcleo de configuração e os aplicativos específicos da regra de negócio:
 
 ```text
 gestao-despesas-django/
 ├── manage.py
 ├── README.md
 ├── requirements.txt
-├── .env (criado localmente; não versionado)
+├── .env.example
+├── .env                         # criado localmente; não versionado
+├── clear_and_populate.sql       # dados de demonstração; limpa o banco
 ├── gestao_despesas/
-│   ├── __init__.py
-│   ├── asgi.py
 │   ├── settings.py
 │   ├── urls.py
+│   ├── asgi.py
 │   └── wsgi.py
 ├── accounts/
 │   ├── migrations/
 │   ├── templates/
-│   │   ├── admin/users.html
+│   │   ├── accounts/
+│   │   ├── admin/
+│   │   ├── app_base.html
 │   │   ├── base.html
 │   │   └── index.html
-│   ├── __init__.py
 │   ├── admin.py
-│   ├── apps.py
+│   ├── forms.py
 │   ├── models.py
-│   ├── views.py
+│   ├── services.py
 │   ├── urls.py
+│   ├── views.py
 │   └── tests.py
 ├── expenses/
 │   ├── migrations/
-│   ├── templates/admin/
-│   │   ├── expense.html
-│   │   ├── expensesplit.html
-│   │   ├── groups.html
-│   │   └── groupmembership.html
-│   ├── __init__.py
+│   ├── templates/
+│   │   ├── admin/
+│   │   └── expenses/
 │   ├── admin.py
-│   ├── apps.py
+│   ├── forms.py
 │   ├── models.py
+│   ├── services.py
+│   ├── urls.py
 │   ├── views.py
 │   └── tests.py
 ├── static/
-│   └── js/ (charts.js, theme.js)
-└── staticfiles/ (saída gerada para arquivos estáticos)
-
+│   ├── css/
+│   └── js/
+└── staticfiles/                  # arquivos estáticos coletados
 ```
 
-* **gestao_despesas/**: Pasta principal que contém os arquivos de configuração global do projeto.
-* **settings.py**: Arquivo onde são definidas as configurações gerais, conexões com o PostgreSQL, aplicativos instalados e middlewares.
-* **urls.py**: Arquivo central que mapeia as rotas globais da aplicação web para os aplicativos correspondentes.
+- **`gestao_despesas/`**: configurações globais, banco, autenticação e rotas principais.
+- **`accounts/`**: usuário customizado, autenticação, perfil, amizades e administração de contas.
+- **`expenses/`**: grupos, membros, despesas, divisões, validações e cálculo de balanços.
+- **`static/`**: estilos e scripts da interface. Em produção, execute `python manage.py collectstatic`.
+- **`staticfiles/`**: diretório de saída dos arquivos estáticos coletados.
 
+## Controle de Versão e Colaboração
 
-* **accounts/**: Modelo customizado de usuário e administração de usuários.
-* **expenses/**: Modelos de grupos, memberships, despesas e divisões, com validações e configuração administrativa.
-* **static/**: Scripts usados pelo tema e pelos gráficos do admin.
-
-
-* **manage.py**: Utilitário de linha de comando principal do Django que permite interagir com o projeto para executar tarefas administrativas, como rodar o servidor de desenvolvimento, aplicar migrações e criar superusuários.
-* **.env**: Arquivo de configuração local (não versionado) com chave, modo de execução, hosts e credenciais do PostgreSQL.
-* **README.md**: Documentação principal do projeto que apresenta a visão geral do sistema, instruções de instalação, arquitetura de pastas e guias de execução.
+O fluxo de trabalho previsto utiliza Git e GitHub, com as branches `main` (versão estável), `develop` (integração) e `feature/<assunto>` (funcionalidades). As alterações devem ser integradas por pull requests.

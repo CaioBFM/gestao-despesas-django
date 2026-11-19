@@ -1,0 +1,32 @@
+{% extends 'app_base.html' %}
+{% load static %}
+{% block titulo %}{{ expense.title }} - Despesa{% endblock %}
+{% block pagina_titulo %}Despesas{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}"><link rel="stylesheet" href="{% static 'css/expenses.css' %}">{% endblock %}
+{% block conteudo %}
+<a href="{% url 'group_detail' group.pk %}" class="se-detail-back"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Voltar ao grupo</a>
+<header class="se-groups-heading se-detail-heading">
+    <div><h1>{{ expense.title }}</h1><p>Grupo: <a class="se-expense-link" href="{% url 'group_detail' group.pk %}">{{ group.name }}</a> · {{ expense.date|date:'d/m/Y' }} · Pago por: <strong>{{ expense.paid_by.username }}</strong> · Cadastrado por: {{ expense.created_by.username }}</p></div>
+    {% if can_manage %}<div class="se-detail-actions"><a href="{% url 'expense_update' expense.pk %}" class="se-groups-button se-groups-button-secondary"><i class="fa-solid fa-pen" aria-hidden="true"></i> Editar</a><a href="{% url 'expense_delete' expense.pk %}" class="se-groups-button se-groups-button-secondary se-detail-danger"><i class="fa-solid fa-trash" aria-hidden="true"></i> Excluir</a></div>{% endif %}
+</header>
+{% include 'expenses/group_messages.html' %}
+{% if expense.description %}<section class="se-groups-panel se-expense-description"><strong>Descrição</strong><p>{{ expense.description }}</p></section>{% endif %}
+<div class="se-expense-summary">
+    <article class="se-groups-panel se-detail-balance"><div><p>Valor total</p><strong>R$ {{ expense.amount|floatformat:2 }}</strong></div></article>
+    <article class="se-groups-panel se-detail-balance se-expense-paid"><div><p>Já pago</p><strong>R$ {{ paid_total|floatformat:2 }}</strong></div></article>
+    <article class="se-groups-panel se-detail-balance se-detail-due"><div><p>Restante a pagar</p><strong>R$ {{ remaining_total|floatformat:2 }}</strong></div></article>
+    <article class="se-groups-panel se-detail-balance"><div><p>Seu status</p>{% if user_status == 'Paga' %}<span class="se-detail-badge se-detail-success">Paga (R$ {{ user_split.amount_owed|floatformat:2 }})</span>{% elif user_status == 'A pagar' %}<span class="se-detail-badge se-detail-warning">A pagar (R$ {{ user_split.amount_owed|floatformat:2 }})</span>{% elif user_status == 'Cota própria' %}<span class="se-detail-badge se-detail-success">Cota própria (R$ {{ user_split.amount_owed|floatformat:2 }})</span>{% else %}<span class="se-detail-badge">Não participa</span>{% endif %}</div></article>
+</div>
+{% if request.user.pk == expense.paid_by_id and remaining_total > 0 %}<p class="se-expense-muted">Você adiantou R$ {{ remaining_total|floatformat:2 }} aos demais.</p>{% endif %}
+<section class="se-groups-panel se-detail-panel" aria-labelledby="splits-title">
+    <div class="se-detail-panel-heading"><h2 id="splits-title">Divisões entre participantes</h2></div>
+    <div class="se-detail-table-wrap"><table class="se-detail-table">
+        <thead><tr><th>Participante</th><th>Valor devido</th><th>Status</th><th>Pagamento</th></tr></thead>
+        <tbody>{% for row in splits_with_perms %}<tr>
+            <td>{{ row.split.user.username }}</td><td><strong>R$ {{ row.split.amount_owed|floatformat:2 }}</strong></td>
+            <td>{% if row.split.user_id == expense.paid_by_id %}<span class="se-detail-badge se-detail-success">Cota própria</span>{% elif row.split.is_paid %}<span class="se-detail-badge se-detail-success">Paga</span>{% else %}<span class="se-detail-badge se-detail-warning">A pagar</span>{% endif %}</td>
+            <td>{% if row.split.user_id == expense.paid_by_id %}<span class="se-expense-muted">—</span>{% elif row.can_toggle %}<form method="post" action="{% url 'split_toggle_paid' row.split.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}"><button type="submit" class="se-detail-action">{% if row.split.is_paid %}Marcar como A pagar{% else %}Marcar como Paga{% endif %}</button></form>{% else %}<span class="se-expense-muted">Sem permissão</span>{% endif %}</td>
+        </tr>{% empty %}<tr><td colspan="4" class="se-detail-empty">Nenhuma divisão registrada.</td></tr>{% endfor %}</tbody>
+    </table></div>
+</section>
+{% endblock %}
