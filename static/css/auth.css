@@ -1,0 +1,129 @@
+/* SplitExpenses — Autenticação. CSS isolado das páginas de CRUD e Django Admin. */
+.se-auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 42px 24px;
+  position: relative;
+  background: var(--se-bg, #f8f6f2);
+  color: var(--se-text, #243447);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+}
+.se-auth-card {
+  width: min(940px, 100%);
+  min-height: 570px;
+  display: grid;
+  grid-template-columns: 46% 54%;
+  background: var(--se-surface, #fffdf9);
+  border: 1px solid var(--se-border, #e7dfd4);
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(36, 52, 71, .09);
+  overflow: hidden;
+}
+.se-auth-brand {
+  position: relative;
+  overflow: hidden;
+  background: #d9e7f3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 60px 28px;
+  text-align: center;
+}
+.se-brand-lockup { position: relative; display: grid; justify-items: center; gap: 18px; z-index: 1; }
+.se-brand-symbol {
+  display: grid;
+  place-items: center;
+  color: #263f5b;
+  width: 76px;
+  height: 76px;
+  padding: 10px;
+  border-radius: 22px;
+  background: rgba(255,255,255,.42);
+  box-shadow: 0 10px 28px rgba(38,63,91,.08);
+}
+.se-brand-symbol svg { width: 100%; height: 100%; }
+.se-brand-name { font-size: 29px; font-weight: 700; letter-spacing: -1.2px; color: #243447; white-space: nowrap; }
+.se-brand-name span { color: #4f7cac; }
+.se-auth-brand > p { position: relative; z-index: 1; color: #526b82; font-size: 13px; margin: 0; }
+.se-brand-arc { position: absolute; border: 1px solid rgba(255,255,255,.55); border-radius: 50%; pointer-events: none; }
+.se-brand-arc-one { width: 260px; height: 260px; left: -155px; top: -90px; border-width: 34px; }
+.se-brand-arc-two { width: 190px; height: 190px; right: -95px; bottom: -75px; border-width: 24px; }
+.se-brand-arc-three { width: 70px; height: 70px; right: 32px; top: 35px; border-color: rgba(201,166,107,.4); border-width: 12px; }
+.se-auth-form-panel {
+  padding: 56px 68px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+}
+.se-auth-heading { margin-bottom: 6px; }
+.se-auth-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.8px; color: var(--se-gold, #c9a66b); }
+.se-auth-heading h1 { font-size: 30px; line-height: 1.2; letter-spacing: -1px; font-weight: 700; margin: 5px 0 7px; color: var(--se-text, #243447); }
+.se-auth-heading p { color: var(--se-muted, #5e6b78); font-size: 14px; margin: 0; }
+.se-login-form { display: flex; flex-direction: column; gap: 18px; }
+.se-auth-field { display: flex; flex-direction: column; gap: 7px; }
+.se-auth-field label { color: var(--se-text, #243447); font-size: 12px; font-weight: 600; }
+.se-auth-field input {
+  width: 100%; height: 43px;
+  padding: 0 13px; border-radius: 8px;
+  color: var(--se-text, #243447);
+  background: var(--se-surface, #fffdf9);
+  border: 1px solid var(--se-border, #e7dfd4);
+  font-size: 13px;
+  outline: none;
+  transition: border-color .18s, box-shadow .18s;
+}
+.se-auth-field input::placeholder { color: var(--se-muted, #5e6b78); opacity: .75; }
+.se-auth-field input:focus { border-color: var(--se-primary, #4f7cac); box-shadow: 0 0 0 3px rgba(79,124,172,.15); }
+.se-auth-alert { color: var(--se-danger, #c96a6a); border: 1px solid var(--se-danger, #c96a6a); background: var(--se-danger-soft, #faeeee); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.se-field-error { color: var(--se-danger, #c96a6a); font-size: 12px; }
+.se-btn-primary {
+  width: 100%; min-height: 42px;
+  background: var(--se-primary, #4f7cac);
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .18s, transform .18s;
+}
+.se-btn-primary:hover { background: var(--se-primary-hover, #3f6a96); transform: translateY(-1px); }
+.se-btn-primary:focus-visible, .se-theme-toggle:focus-visible, .se-auth-switch a:focus-visible { outline: 3px solid var(--se-primary, #4f7cac); outline-offset: 3px; }
+.se-auth-switch { margin: 2px 0 0; text-align: center; color: var(--se-muted, #5e6b78); font-size: 13px; }
+.se-auth-switch a { font-weight: 700; color: var(--se-primary, #4f7cac); text-decoration: none; }
+.se-auth-switch a:hover { text-decoration: underline; }
+.se-theme-toggle {
+  position: absolute; top: 26px; right: 28px;
+  z-index: 3; width: 40px; height: 40px;
+  display: grid; place-items: center;
+  color: var(--se-muted, #5e6b78);
+  background: var(--se-surface, #fffdf9);
+  border: 1px solid var(--se-border, #e7dfd4);
+  border-radius: 50%; cursor: pointer;
+  box-shadow: var(--se-shadow, 0 8px 30px rgba(36,52,71,.05));
+}
+.se-icon-sun { display: none; }
+[data-bs-theme="dark"] .se-icon-moon { display: none; }
+[data-bs-theme="dark"] .se-icon-sun { display: block; }
+[data-bs-theme="dark"] .se-auth-brand { background: #30465a; }
+[data-bs-theme="dark"] .se-auth-brand > p { color: #c4d3df; }
+[data-bs-theme="dark"] .se-brand-symbol { color: #b8d0e6; }
+[data-bs-theme="dark"] .se-brand-name { color: #f3f5f7; }
+[data-bs-theme="dark"] .se-brand-name span { color: #7da2c8; }
+[data-bs-theme="dark"] .se-btn-primary { color: #152536; }
+@media (max-width: 720px) {
+  .se-auth-page { padding: 0; }
+  .se-auth-card { min-height: 100vh; display: block; border: 0; border-radius: 0; }
+  .se-auth-brand { min-height: 210px; padding: 35px; }
+  .se-auth-brand > p { display: none; }
+  .se-brand-lockup { gap: 8px; }
+  .se-brand-symbol { width: 58px; height: 58px; }
+  .se-brand-name { font-size: 22px; }
+  .se-auth-form-panel { padding: 35px 27px 45px; }
+  .se-theme-toggle { top: 15px; right: 15px; }
+}
+@media (prefers-reduced-motion: reduce) { .se-btn-primary, .se-auth-field input { transition: none; } }
