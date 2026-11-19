@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block titulo %}Excluir Despesa - {{ expense.title }}{% endblock %}
+{% block conteudo %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-danger">
+            <div class="card-body p-4">
+                <h3 class="text-danger mb-3"><i class="fas fa-triangle-exclamation me-2"></i>Confirmar Exclusão</h3>
+                <p>Tem certeza de que deseja excluir a despesa <strong>"{{ expense.title }}"</strong> (R$ {{ expense.amount|floatformat:2 }}) do grupo <strong>{{ group.name }}</strong>?</p>
+                <p class="small text-muted">Todas as divisões vinculadas a esta despesa também serão removidas.</p>
+
+                <form method="post" class="d-flex justify-content-end gap-2 mt-4">
+                    {% csrf_token %}
+                    <a href="{% url 'expense_detail' expense.pk %}" class="btn btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-danger">Sim, Excluir</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% block titulo %}{{ expense.title }} - Despesa{% endblock %}
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+    <div>
+        <h1 class="fw-bold text-primary mb-1">{{ expense.title }}</h1>
+        <p class="text-muted mb-0">
+            Grupo: <a href="{% url 'group_detail' group.pk %}">{{ group.name }}</a> ·
+            Data: {{ expense.date|date:"d/m/Y" }} ·
+            Pago por: <strong>{{ expense.paid_by.username }}</strong> ·
+            Cadastrado por: {{ expense.created_by.username }}
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        {% if can_manage %}
+            <a href="{% url 'expense_update' expense.pk %}" class="btn btn-outline-primary">
+                <i class="fas fa-edit me-1"></i> Editar
+            </a>
+            <a href="{% url 'expense_delete' expense.pk %}" class="btn btn-outline-danger">
+                <i class="fas fa-trash me-1"></i> Excluir
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+{% if expense.description %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <strong>Descrição:</strong>
+        <p class="mb-0 mt-1">{{ expense.description }}</p>
+    </div>
+</div>
+{% endif %}
+
+<div class="row mb-4 g-3">
+    <div class="col-md-3">
+        <div class="card shadow-sm bg-body-tertiary border-0 h-100">
+            <div class="card-body">
+                <span class="small text-muted d-block">Valor Total</span>
+                <strong class="fs-4">R$ {{ expense.amount|floatformat:2 }}</strong>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm bg-body-tertiary border-0 h-100">
+            <div class="card-body">
+                <span class="small text-muted d-block">Já Quitado</span>
+                <strong class="fs-4 text-success">R$ {{ paid_total|floatformat:2 }}</strong>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm bg-body-tertiary border-0 h-100">
+            <div class="card-body">
+                <span class="small text-muted d-block">Restante a Quitar</span>
+                <strong class="fs-4 text-warning">R$ {{ remaining_total|floatformat:2 }}</strong>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm bg-body-tertiary border-0 h-100">
+            <div class="card-body">
+                <span class="small text-muted d-block">Seu Status</span>
+                {% if user_status == 'Paga' %}
+                    <span class="badge bg-success fs-6 mt-1">Paga (R$ {{ user_split.amount_owed|floatformat:2 }})</span>
+                {% elif user_status == 'A pagar' %}
+                    <span class="badge bg-warning text-dark fs-6 mt-1">A pagar (R$ {{ user_split.amount_owed|floatformat:2 }})</span>
+                {% else %}
+                    <span class="badge bg-secondary fs-6 mt-1">Não participa</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<h3 class="mb-3"><i class="fas fa-list-check me-2"></i>Divisões entre Participantes</h3>
+<div class="card shadow-sm mb-4">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Participante</th>
+                    <th>Valor Devido</th>
+                    <th>Status</th>
+                    <th class="text-end">Pagamento</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in splits_with_perms %}
+                <tr>
+                    <td>{{ row.split.user.username }}</td>
+                    <td><strong>R$ {{ row.split.amount_owed|floatformat:2 }}</strong></td>
+                    <td>
+                        {% if row.split.is_paid %}
+                            <span class="badge bg-success">Paga</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">A pagar</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        {% if row.can_toggle %}
+                            <form method="post" action="{% url 'split_toggle_paid' row.split.pk %}" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.path }}">
+                                {% if row.split.is_paid %}
+                                    <button type="submit" class="btn btn-sm btn-outline-warning">
+                                        Marcar como A pagar
+                                    </button>
+                                {% else %}
+                                    <button type="submit" class="btn btn-sm btn-success">
+                                        Marcar como Paga
+                                    </button>
+                                {% endif %}
+                            </form>
+                        {% else %}
+                            <span class="small text-muted">Sem permissão</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-3">Nenhuma divisão registrada.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<a href="{% url 'group_detail' group.pk %}" class="btn btn-secondary">
+    <i class="fas fa-arrow-left me-1"></i> Voltar ao Grupo
+</a>
+{% endblock %}

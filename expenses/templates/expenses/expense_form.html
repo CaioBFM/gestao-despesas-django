@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% block titulo %}{% if is_edit %}Editar Despesa{% else %}Nova Despesa{% endif %} - {{ group.name }}{% endblock %}
+{% block conteudo %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="mb-1">
+                    <i class="fas fa-receipt me-2"></i>
+                    {% if is_edit %}Editar Despesa{% else %}Nova Despesa{% endif %}
+                </h2>
+                <p class="text-muted mb-4">Grupo: <strong>{{ group.name }}</strong></p>
+
+                <form method="post" id="expense-form">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="{{ form.title.id_for_label }}" class="form-label fw-bold">{{ form.title.label }}</label>
+                        {{ form.title }}
+                        {{ form.title.errors }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">{{ form.description.label }}</label>
+                        {{ form.description }}
+                        {{ form.description.errors }}
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label for="{{ form.amount.id_for_label }}" class="form-label fw-bold">{{ form.amount.label }} (R$)</label>
+                            {{ form.amount }}
+                            {{ form.amount.errors }}
+                        </div>
+                        <div class="col-md-4">
+                            <label for="{{ form.date.id_for_label }}" class="form-label fw-bold">{{ form.date.label }}</label>
+                            {{ form.date }}
+                            {{ form.date.errors }}
+                        </div>
+                        <div class="col-md-4">
+                            <label for="{{ form.paid_by.id_for_label }}" class="form-label fw-bold">Quem Pagou</label>
+                            {{ form.paid_by }}
+                            {{ form.paid_by.errors }}
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">Participantes e Valores Específicos</h5>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="splitEqually()">
+                            <i class="fas fa-divide me-1"></i> Dividir Total Igualmente
+                        </button>
+                    </div>
+                    <p class="small text-muted">Marque quem participa da divisão e informe o valor devido por cada pessoa.</p>
+
+                    <div class="table-responsive border rounded mb-4">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 90px;">Participa</th>
+                                    <th>Membro</th>
+                                    <th style="width: 200px;">Valor Devido (R$)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in participant_rows %}
+                                <tr>
+                                    <td class="text-center">
+                                        <input type="checkbox"
+                                               class="form-check-input split-checkbox"
+                                               name="split_participates_{{ row.user.pk }}"
+                                               id="chk_{{ row.user.pk }}"
+                                               {% if row.checked %}checked{% endif %}>
+                                    </td>
+                                    <td>
+                                        <label for="chk_{{ row.user.pk }}" class="mb-0 fw-semibold">
+                                            {{ row.user.username }}
+                                        </label>
+                                    </td>
+                                    <td>
+                                        <input type="number"
+                                               step="0.01"
+                                               min="0.01"
+                                               class="form-control form-control-sm split-amount"
+                                               name="split_amount_{{ row.user.pk }}"
+                                               value="{{ row.amount }}"
+                                               placeholder="0.00">
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-3">
+                                        Nenhum membro aceito neste grupo.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        {% if is_edit %}
+                            <a href="{% url 'expense_detail' expense.pk %}" class="btn btn-secondary">Cancelar</a>
+                        {% else %}
+                            <a href="{% url 'group_detail' group.pk %}" class="btn btn-secondary">Cancelar</a>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>
+                            {% if is_edit %}Salvar Alterações{% else %}Salvar Despesa{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function splitEqually() {
+    const totalInput = document.getElementById('id_amount');
+    const total = parseFloat(totalInput.value);
+    if (isNaN(total) || total <= 0) {
+        alert('Informe um Valor Total maior que zero antes de dividir igualmente.');
+        return;
+    }
+
+    const rows = document.querySelectorAll('.split-checkbox');
+    const checkedInputs = [];
+    rows.forEach((chk) => {
+        if (chk.checked) {
+            const tr = chk.closest('tr');
+            const amtInput = tr.querySelector('.split-amount');
+            if (amtInput) checkedInputs.push(amtInput);
+        }
+    });
+
+    if (checkedInputs.length === 0) {
+        alert('Marque ao menos um participante para dividir o valor.');
+        return;
+    }
+
+    const baseShare = Math.floor((total / checkedInputs.length) * 100) / 100;
+    let remainder = Math.round((total - baseShare * checkedInputs.length) * 100) / 100;
+
+    checkedInputs.forEach((inp) => {
+        let share = baseShare;
+        if (remainder > 0) {
+            share = Math.round((share + 0.01) * 100) / 100;
+            remainder = Math.round((remainder - 0.01) * 100) / 100;
+        }
+        inp.value = share.toFixed(2);
+    });
+}
+</script>
+{% endblock %}

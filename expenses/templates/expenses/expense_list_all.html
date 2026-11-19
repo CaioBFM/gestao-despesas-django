@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block titulo %}Todas as Despesas - SplitExpenses{% endblock %}
+{% block conteudo %}
+<h2 class="mb-4"><i class="fas fa-receipt me-2"></i>Despesas dos Meus Grupos</h2>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Despesa</th>
+                    <th>Grupo</th>
+                    <th>Data</th>
+                    <th>Pago por</th>
+                    <th>Valor Total</th>
+                    <th>Seu Status</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in expense_items %}
+                <tr>
+                    <td><strong>{{ item.expense.title }}</strong></td>
+                    <td><a href="{% url 'group_detail' item.expense.group.pk %}">{{ item.expense.group.name }}</a></td>
+                    <td>{{ item.expense.date|date:"d/m/Y" }}</td>
+                    <td>{{ item.expense.paid_by.username }}</td>
+                    <td>R$ {{ item.expense.amount|floatformat:2 }}</td>
+                    <td>
+                        {% if item.user_status == 'Paga' %}
+                            <span class="badge bg-success">Paga (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>
+                        {% elif item.user_status == 'A pagar' %}
+                            <span class="badge bg-warning text-dark">A pagar (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Não participa</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'expense_detail' item.expense.pk %}" class="btn btn-sm btn-outline-primary">Detalhes</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">Nenhuma despesa encontrada nos seus grupos.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
