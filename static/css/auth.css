@@ -127,3 +127,45 @@
   .se-theme-toggle { top: 15px; right: 15px; }
 }
 @media (prefers-reduced-motion: reduce) { .se-btn-primary, .se-auth-field input { transition: none; } }
+
+
+/* Cadastro — SplitExpenses */
+
+.se-register-panel {
+    padding-top: 36px;
+    padding-bottom: 36px;
+}
+
+.se-register-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 16px;
+}
+
+.se-register-field-wide {
+    grid-column: 1 / -1;
+}
+
+.se-register-grid .se-auth-field {
+    min-width: 0;
+}
+
+.se-register-grid .se-auth-field input {
+    width: 100%;
+    min-width: 0;
+}
+
+.se-required {
+    color: var(--se-danger);
+    font-weight: 600;
+}
+
+@media (max-width: 520px) {
+    .se-register-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .se-register-field-wide {
+        grid-column: auto;
+    }
+}
