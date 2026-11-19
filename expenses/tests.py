@@ -386,7 +386,7 @@ class ExpenseAccessTests(TestCase):
         self.admin = CustomUser.objects.create_user(username='admin2')
         self.group = Group.objects.create(name='Grupo', created_by=self.admin)
         self.membership = GroupMembership.objects.create(group=self.group, user=self.owner, is_accepted=True)
-        self.expense = Expense.objects.create(group=self.group, paid_by=self.owner, created_by=self.owner, title='Compra', amount=Decimal('10.00'), date=date(2026, 11, 19))
+        self.expense = Expense.objects.create(group=self.group, paid_by=self.admin, created_by=self.owner, title='Compra', amount=Decimal('10.00'), date=date(2026, 11, 19))
         self.split = ExpenseSplit.objects.create(expense=self.expense, user=self.owner, amount_owed=Decimal('10.00'))
         self.client.force_login(self.owner)
 
@@ -403,7 +403,7 @@ class ExpenseAccessTests(TestCase):
             self.assertEqual(self.expense.title, 'Compra')
 
     def test_membro_autorizado_pode_editar_alterar_pagamento_e_excluir(self):
-        data = {'title': 'Alterada', 'amount': '10.00', 'date': '2026-11-19', 'paid_by': self.owner.pk, f'split_participates_{self.owner.pk}': 'on', f'split_amount_{self.owner.pk}': '10.00'}
+        data = {'title': 'Alterada', 'amount': '10.00', 'date': '2026-11-19', 'paid_by': self.admin.pk, f'split_participates_{self.owner.pk}': 'on', f'split_amount_{self.owner.pk}': '10.00'}
         self.client.post(reverse('expense_update', args=[self.expense.pk]), data)
         self.expense.refresh_from_db()
         self.assertEqual(self.expense.title, 'Alterada')
@@ -586,3 +586,42 @@ class ExpenseBalanceDisplayTests(TestCase):
         self.assertEqual(detail.context['remaining_total'], Decimal('0.00'))
         self.assertEqual(detail.context['paid_total'], Decimal('60.00'))
         self.assertEqual(detail.context['user_status'], 'Paga')
+
+    def test_cota_propria_nao_pode_ser_alterada_por_nenhum_usuario(self):
+        superuser = CustomUser.objects.create_superuser(username='balance_super', password='senha')
+        for user in (self.payer, self.debtor, superuser):
+            with self.subTest(user=user):
+                self.client.force_login(user)
+                detail = self.client.get(reverse('expense_detail', args=[self.expense.pk]))
+                self.assertNotContains(detail, reverse('split_toggle_paid', args=[self.own.pk]))
+                response = self.client.post(reverse('split_toggle_paid', args=[self.own.pk]))
+                self.assertEqual(response.status_code, 302)
+                self.own.refresh_from_db()
+                self.assertFalse(self.own.is_paid)
+        self.client.force_login(superuser)
+        self.client.post(reverse('split_toggle_paid', args=[self.pending.pk]))
+        self.pending.refresh_from_db()
+        self.assertTrue(self.pending.is_paid)
+
+    def test_adiantamento_aparece_apenas_ao_pagador_com_saldo_pendente(self):
+        self.client.force_login(self.payer)
+        response = self.client.get(reverse('expense_detail', args=[self.expense.pk]))
+        self.assertContains(response, 'Você adiantou R$ 35,00 aos demais')
+        self.assertContains(response, 'Voltar ao grupo', count=1)
+        self.client.force_login(self.debtor)
+        self.assertNotContains(self.client.get(reverse('expense_detail', args=[self.expense.pk])), 'Você adiantou')
+        self.pending.is_paid = True
+        self.pending.save()
+        self.client.force_login(self.payer)
+        self.assertNotContains(self.client.get(reverse('expense_detail', args=[self.expense.pk])), 'Você adiantou')
+
+    def test_formularios_mostram_somente_campos_obrigatorios(self):
+        self.client.force_login(self.payer)
+        for url in (reverse('expense_create', args=[self.group.pk]), reverse('expense_update', args=[self.expense.pk])):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(response, 'Título *')
+                self.assertContains(response, 'Valor Total (R$) *')
+                self.assertContains(response, 'Data do Gasto *')
+                self.assertContains(response, 'Quem Pagou *')
+                self.assertNotContains(response, 'Descrição *')

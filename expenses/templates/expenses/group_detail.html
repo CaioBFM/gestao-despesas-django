@@ -23,14 +23,14 @@
 <section class="se-groups-panel se-detail-panel" aria-labelledby="expenses-title">
     <div class="se-detail-panel-heading"><h2 id="expenses-title">Despesas do grupo</h2><a href="{% url 'expense_create' group.pk %}" class="se-groups-button se-groups-button-primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Nova despesa</a></div>
     <div class="se-detail-table-wrap"><table class="se-detail-table">
-        <thead><tr><th>Título</th><th>Data</th><th>Pago por</th><th>Valor total</th><th>Sua participação</th><th>Quitação</th><th>Ações</th></tr></thead>
+        <thead><tr><th>Título</th><th>Data</th><th>Pago por</th><th>Valor total</th><th>Sua participação</th><th>Pagamento</th><th>Ações</th></tr></thead>
         <tbody>
         {% for item in expense_items %}
         <tr>
             <td><strong>{{ item.expense.title }}</strong>{% if item.expense.description %}<small>{{ item.expense.description|truncatechars:60 }}</small>{% endif %}</td>
             <td>{{ item.expense.date|date:'d/m/Y' }}</td><td>{{ item.expense.paid_by.username }}</td><td><strong>R$ {{ item.expense.amount|floatformat:2 }}</strong></td>
             <td>{% if item.user_status == 'Paga' %}<span class="se-detail-badge se-detail-success">Paga (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>{% elif item.user_status == 'A pagar' %}<span class="se-detail-badge se-detail-warning">A pagar (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>{% elif item.user_status == 'Cota própria' %}<span class="se-detail-badge se-detail-info">Cota própria (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>{% else %}<span class="se-detail-badge">Não participa</span>{% endif %}</td>
-            <td>{{ item.paid_splits_count }}/{{ item.total_splits_count }} quitadas</td>
+            <td>{{ item.paid_splits_count }}/{{ item.total_splits_count }} pagas</td>
             <td><div class="se-detail-actions"><a href="{% url 'expense_detail' item.expense.pk %}" class="se-detail-action">Ver</a>{% if item.can_manage %}<a href="{% url 'expense_update' item.expense.pk %}" class="se-detail-action" aria-label="Editar {{ item.expense.title }}" title="Editar"><i class="fa-solid fa-pen" aria-hidden="true"></i></a><a href="{% url 'expense_delete' item.expense.pk %}" class="se-detail-action se-detail-danger" aria-label="Excluir {{ item.expense.title }}" title="Excluir"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>{% endif %}</div></td>
         </tr>
         {% empty %}<tr><td colspan="7" class="se-detail-empty">Nenhuma despesa cadastrada neste grupo ainda.</td></tr>{% endfor %}

@@ -1,68 +1,70 @@
-{% extends 'base.html' %}
+{% extends 'app_base.html' %}
+{% load static %}
 {% block titulo %}{% if is_edit %}Editar Despesa{% else %}Nova Despesa{% endif %} - {{ group.name }}{% endblock %}
+{% block pagina_titulo %}Despesas{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}"><link rel="stylesheet" href="{% static 'css/expenses.css' %}">{% endblock %}
 {% block conteudo %}
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="card shadow-sm">
-            <div class="card-body p-4">
-                <h2 class="mb-1">
+{% include 'expenses/group_messages.html' %}
+<div class="se-groups-panel se-expense-form-panel">
+                <h1 class="se-expense-form-title">
                     <i class="fas fa-receipt me-2"></i>
                     {% if is_edit %}Editar Despesa{% else %}Nova Despesa{% endif %}
-                </h2>
-                <p class="text-muted mb-4">Grupo: <strong>{{ group.name }}</strong></p>
+                </h1>
+                <p class="se-expense-muted mb-4">Grupo: <strong>{{ group.name }}</strong></p>
 
-                <form method="post" id="expense-form">
+                <form method="post" id="expense-form" class="se-expense-form">
+                    {{ form.non_field_errors }}
                     {% csrf_token %}
 
                     <div class="mb-3">
-                        <label for="{{ form.title.id_for_label }}" class="form-label fw-bold">{{ form.title.label }}</label>
+                        <label for="{{ form.title.id_for_label }}" class="form-label">{{ form.title.label }}{% if form.title.field.required %} *{% endif %}</label>
                         {{ form.title }}
                         {{ form.title.errors }}
                     </div>
 
                     <div class="mb-3">
-                        <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">{{ form.description.label }}</label>
+                        <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}{% if form.description.field.required %} *{% endif %}</label>
                         {{ form.description }}
                         {{ form.description.errors }}
                     </div>
 
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
-                            <label for="{{ form.amount.id_for_label }}" class="form-label fw-bold">{{ form.amount.label }} (R$)</label>
+                            <label for="{{ form.amount.id_for_label }}" class="form-label">{{ form.amount.label }} (R$){% if form.amount.field.required %} *{% endif %}</label>
                             {{ form.amount }}
                             {{ form.amount.errors }}
                         </div>
                         <div class="col-md-4">
-                            <label for="{{ form.date.id_for_label }}" class="form-label fw-bold">{{ form.date.label }}</label>
+                            <label for="{{ form.date.id_for_label }}" class="form-label">{{ form.date.label }}{% if form.date.field.required %} *{% endif %}</label>
                             {{ form.date }}
                             {{ form.date.errors }}
                         </div>
                         <div class="col-md-4">
-                            <label for="{{ form.paid_by.id_for_label }}" class="form-label fw-bold">Quem Pagou</label>
+                            <label for="{{ form.paid_by.id_for_label }}" class="form-label">Quem Pagou{% if form.paid_by.field.required %} *{% endif %}</label>
                             {{ form.paid_by }}
                             {{ form.paid_by.errors }}
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="se-expense-split-heading">
                         <h5 class="mb-0">Participantes e Valores Específicos</h5>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="splitEqually()">
+                        <button type="button" class="se-groups-button se-groups-button-secondary" onclick="splitEqually()">
                             <i class="fas fa-divide me-1"></i> Dividir Total Igualmente
                         </button>
                     </div>
-                    <p class="small text-muted">Marque quem participa da divisão e informe o valor devido por cada pessoa.</p>
+                    <p class="se-expense-muted">Marque quem participa da divisão e informe o valor devido por cada pessoa.</p>
 
                     <div class="mb-3">
-                        <label for="split-mode" class="form-label fw-bold">Modo de divisão</label>
+                        <label for="split-mode" class="form-label">Modo de divisão</label>
                         <select id="split-mode" name="split_mode" class="form-select">
                             <option value="value" {% if split_mode == 'value' %}selected{% endif %}>Valor (R$)</option>
                             <option value="percentage" {% if split_mode == 'percentage' %}selected{% endif %}>Porcentagem (%)</option>
                         </select>
                     </div>
 
-                    <div class="table-responsive border rounded mb-4">
-                        <table class="table table-hover mb-0 align-middle">
-                            <thead class="table-light">
+                    <div class="se-detail-table-wrap se-expense-split-table">
+                        <table class="se-detail-table">
+                            <thead>
                                 <tr>
                                     <th style="width: 90px;">Participa</th>
                                     <th>Membro</th>
@@ -94,7 +96,7 @@
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="3" class="text-center text-muted py-3">
+                                    <td colspan="3" class="se-detail-empty">
                                         Nenhum membro aceito neste grupo.
                                     </td>
                                 </tr>
@@ -102,24 +104,21 @@
                             </tbody>
                         </table>
                     </div>
-                    <p id="split-total" class="small fw-semibold" aria-live="polite"></p>
-                    <p id="split-warning" class="text-danger small" aria-live="polite"></p>
+                    <p id="split-total" class="se-expense-total" aria-live="polite"></p>
+                    <p id="split-warning" class="se-expense-warning" aria-live="polite"></p>
 
-                    <div class="d-flex justify-content-between">
+                    <div class="se-group-actions">
                         {% if is_edit %}
-                            <a href="{% url 'expense_detail' expense.pk %}" class="btn btn-secondary">Cancelar</a>
+                            <a href="{% url 'expense_detail' expense.pk %}" class="se-groups-button se-groups-button-secondary">Cancelar</a>
                         {% else %}
-                            <a href="{% url 'group_detail' group.pk %}" class="btn btn-secondary">Cancelar</a>
+                            <a href="{% url 'group_detail' group.pk %}" class="se-groups-button se-groups-button-secondary">Cancelar</a>
                         {% endif %}
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="se-groups-button se-groups-button-primary">
                             <i class="fas fa-save me-1"></i>
                             {% if is_edit %}Salvar Alterações{% else %}Salvar Despesa{% endif %}
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
-    </div>
 </div>
 
 <script>

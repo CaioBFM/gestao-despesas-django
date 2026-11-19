@@ -53,6 +53,8 @@ def _can_manage_expense(user, expense, group, membership=None):
 
 
 def _can_toggle_split(user, split, membership):
+    if split.user_id == split.expense.paid_by_id:
+        return False
     return _can_manage_expense(user, split.expense, split.expense.group, membership) or bool(
         membership and membership.is_accepted and split.user_id == user.pk
     )
