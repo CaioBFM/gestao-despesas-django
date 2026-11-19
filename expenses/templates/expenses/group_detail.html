@@ -55,7 +55,7 @@
     </table></div>
 </section>
 
-{# Participantes: todas as ações são enviadas por POST com confirmação em modal #}
+{# Participantes: atualizações usam PUT e remoções usam DELETE #}
 <section class="se-groups-panel se-detail-panel" aria-labelledby="members-title">
     <div class="se-detail-panel-heading"><h2 id="members-title">Participantes</h2></div>
     <div class="se-detail-table-wrap"><table class="se-detail-table">
@@ -67,19 +67,19 @@
             <td>{% if m.is_group_admin %}<span class="se-detail-badge se-detail-info">Admin do grupo</span>{% else %}<span class="se-detail-badge">Membro</span>{% endif %}</td>
             <td>{% if is_admin and m.user != request.user %}
                 <form method="post" action="{% url 'member_action' group.pk m.pk %}" class="se-detail-actions">{% csrf_token %}
-                    {% if not m.is_accepted %}<button type="submit" name="action" value="accept" class="se-detail-action" title="Aceitar" aria-label="Aceitar {{ m.user.username }}"><i class="fa-solid fa-check" aria-hidden="true"></i></button>{% endif %}
-                    {% if m.is_accepted %}{% if m.is_group_admin %}<button type="submit" name="action" value="demote" class="se-detail-action" title="Remover cargo de admin" aria-label="Remover cargo de admin de {{ m.user.username }}" data-confirm="Remover o cargo de administrador de {{ m.user.username }}? Ele continuará como membro comum do grupo." data-confirm-title="Remover cargo de admin" data-confirm-ok="Sim, remover cargo" data-confirm-danger="true"><i class="fa-solid fa-user-minus" aria-hidden="true"></i></button>{% else %}<button type="submit" name="action" value="promote" class="se-detail-action" title="Tornar admin" aria-label="Tornar {{ m.user.username }} administrador" data-confirm="Tornar {{ m.user.username }} administrador do grupo? Ele poderá gerenciar membros e editar o grupo." data-confirm-title="Promover a administrador" data-confirm-ok="Sim, promover"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></button>{% endif %}{% endif %}
-                    <button type="submit" name="action" value="kick" class="se-detail-action se-detail-danger" title="{% if m.is_accepted %}Remover do grupo{% else %}Recusar pedido{% endif %}" aria-label="{% if m.is_accepted %}Remover {{ m.user.username }} do grupo{% else %}Recusar pedido de {{ m.user.username }}{% endif %}" data-confirm="{% if m.is_accepted %}Tem certeza que deseja remover {{ m.user.username }} do grupo?{% else %}Tem certeza que deseja recusar o pedido de entrada de {{ m.user.username }}?{% endif %}" data-confirm-title="{% if m.is_accepted %}Remover participante{% else %}Recusar pedido{% endif %}" data-confirm-ok="{% if m.is_accepted %}Sim, remover{% else %}Sim, recusar{% endif %}" data-confirm-danger="true"><i class="fa-solid fa-user-xmark" aria-hidden="true"></i></button>
+                    {% if not m.is_accepted %}<button type="submit" data-method="PUT" name="action" value="accept" class="se-detail-action" title="Aceitar" aria-label="Aceitar {{ m.user.username }}"><i class="fa-solid fa-check" aria-hidden="true"></i></button>{% endif %}
+                    {% if m.is_accepted %}{% if m.is_group_admin %}<button type="submit" data-method="PUT" name="action" value="demote" class="se-detail-action" title="Remover cargo de admin" aria-label="Remover cargo de admin de {{ m.user.username }}" data-confirm="Remover o cargo de administrador de {{ m.user.username }}? Ele continuará como membro comum do grupo." data-confirm-title="Remover cargo de admin" data-confirm-ok="Sim, remover cargo" data-confirm-danger="true"><i class="fa-solid fa-user-minus" aria-hidden="true"></i></button>{% else %}<button type="submit" data-method="PUT" name="action" value="promote" class="se-detail-action" title="Tornar admin" aria-label="Tornar {{ m.user.username }} administrador" data-confirm="Tornar {{ m.user.username }} administrador do grupo? Ele poderá gerenciar membros e editar o grupo." data-confirm-title="Promover a administrador" data-confirm-ok="Sim, promover"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></button>{% endif %}{% endif %}
+                    <button type="submit" data-method="DELETE" name="action" value="kick" class="se-detail-action se-detail-danger" title="{% if m.is_accepted %}Remover do grupo{% else %}Recusar pedido{% endif %}" aria-label="{% if m.is_accepted %}Remover {{ m.user.username }} do grupo{% else %}Recusar pedido de {{ m.user.username }}{% endif %}" data-confirm="{% if m.is_accepted %}Tem certeza que deseja remover {{ m.user.username }} do grupo?{% else %}Tem certeza que deseja recusar o pedido de entrada de {{ m.user.username }}?{% endif %}" data-confirm-title="{% if m.is_accepted %}Remover participante{% else %}Recusar pedido{% endif %}" data-confirm-ok="{% if m.is_accepted %}Sim, remover{% else %}Sim, recusar{% endif %}" data-confirm-danger="true"><i class="fa-solid fa-user-xmark" aria-hidden="true"></i></button>
                 </form>{% endif %}</td>
         </tr>{% endfor %}</tbody>
     </table></div>
 </section>
 
-{# Administração do grupo: POST atualiza título, descrição e código #}
+{# Administração do grupo: PUT atualiza título, descrição e código #}
 {% if is_admin %}
 <section class="se-groups-panel se-detail-panel se-detail-admin" aria-labelledby="admin-title">
     <h2 id="admin-title">Administração do grupo</h2>
-    <form method="post" action="{% url 'group_detail' group.pk %}" class="se-detail-admin-form se-group-edit-form">{% csrf_token %}<input type="hidden" name="action" value="update_info">
+    <form method="post" data-method="PUT" action="{% url 'group_detail' group.pk %}" class="se-detail-admin-form se-group-edit-form">{% csrf_token %}<input type="hidden" name="action" value="update_info">
         <div class="se-group-field"><label for="group-name">Título do grupo</label><input id="group-name" type="text" name="name" maxlength="255" required class="form-control" value="{{ group.name }}"></div>
         <div class="se-group-field"><label for="group-description">Descrição</label><textarea id="group-description" name="description" rows="3" class="form-control">{{ group.description|default_if_none:'' }}</textarea></div>
         <div class="se-group-field"><label for="group-code">Código de convite</label><input id="group-code" type="text" name="invite_code" maxlength="10" class="form-control" value="{{ group.invite_code }}"></div>
@@ -117,10 +117,10 @@
 </section>
 {% endif %}
 
-{# Sair do grupo (POST com confirmação em modal); quem é o único membro exclui o grupo #}
+{# Sair do grupo (DELETE com confirmação em modal); quem é o único membro exclui o grupo #}
 {% if is_member %}
 {% if leave_blocked %}<div class="alert alert-warning" role="alert">Você é o último administrador deste grupo. Promova outro participante a administrador antes de sair.</div>{% endif %}
-<form method="post" action="{% url 'group_leave' group.pk %}" class="se-detail-leave">{% csrf_token %}
+<form method="post" data-method="DELETE" action="{% url 'group_leave' group.pk %}" class="se-detail-leave">{% csrf_token %}
     <button type="submit" class="se-groups-button se-groups-button-secondary se-detail-danger" {% if is_only_member %}name="confirm_delete" value="yes"{% endif %} {% if leave_blocked %}disabled{% endif %}
             data-confirm="{% if is_only_member %}O grupo e todas as despesas serão excluídos permanentemente. Deseja confirmar?{% else %}Deseja realmente sair deste grupo?{% endif %}"
             data-confirm-title="{% if is_only_member %}Excluir grupo{% else %}Sair do grupo{% endif %}"

@@ -1,11 +1,12 @@
 from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
-from django.views.decorators.http import require_GET, require_POST, require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Count, F, Q, Sum
 
 from expenses.models import Expense, ExpenseSplit, Group
+from gestao_despesas.http import get_request_data, redirect_after_action
 from .forms import CadastroForm, UserProfileForm, AddFriendForm
 from .models import CustomUser, Friendship
 from .services import get_friends_queryset
@@ -80,16 +81,16 @@ def cadastro(request):
     return render(request, "accounts/cadastro.html", {"form": form})
 
 
-# GET: exibe o perfil | POST: atualiza nome, sobrenome e e-mail
+# GET: exibe o perfil | PUT: atualiza nome, sobrenome e e-mail
 @login_required
-@require_http_methods(['GET', 'POST'])
+@require_http_methods(['GET', 'PUT'])
 def perfil_usuario(request):
-    if request.method == 'POST':
-        form = UserProfileForm(request.POST, instance=request.user)
+    if request.method == 'PUT':
+        form = UserProfileForm(get_request_data(request), instance=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, 'Perfil atualizado com sucesso.')
-            return redirect('perfil')
+            return redirect_after_action(request, 'perfil')
     else:
         form = UserProfileForm(instance=request.user)
     return render(request, 'accounts/perfil.html', {'form': form})
@@ -163,9 +164,9 @@ def friends_list(request):
     })
 
 
-# POST: destinatário aceita/recusa a solicitação | remetente cancela
+# PUT: destinatário aceita | DELETE: destinatário recusa ou remetente cancela
 @login_required
-@require_POST
+@require_http_methods(['PUT', 'DELETE'])
 def friend_request_action(request, friendship_id):
     friendship = get_object_or_404(
         Friendship.objects.select_related('from_user', 'to_user'),
@@ -175,8 +176,8 @@ def friend_request_action(request, friendship_id):
     is_receiver = friendship.to_user_id == request.user.pk
     is_sender = friendship.from_user_id == request.user.pk
 
-    action = request.POST.get('action')
-    if action == 'accept':
+    action = get_request_data(request).get('action')
+    if request.method == 'PUT' and action == 'accept':
         # Só quem recebeu pode aceitar
         if is_receiver:
             friendship.status = Friendship.STATUS_ACCEPTED
@@ -184,7 +185,7 @@ def friend_request_action(request, friendship_id):
             messages.success(request, f'Agora você e {friendship.from_user.username} são amigos!')
         else:
             messages.error(request, 'Apenas quem recebeu a solicitação pode aceitá-la.')
-    elif action in ('reject', 'cancel'):
+    elif request.method == 'DELETE' and action in ('reject', 'cancel'):
         # O papel do usuário define se é recusa (destinatário) ou cancelamento (remetente)
         if is_receiver:
             friendship.delete()
@@ -197,12 +198,12 @@ def friend_request_action(request, friendship_id):
     else:
         messages.error(request, 'Ação inválida para esta solicitação.')
 
-    return redirect('friends_list')
+    return redirect_after_action(request, 'friends_list')
 
 
-# POST: desfaz uma amizade aceita entre o usuário logado e o usuário informado
+# DELETE: desfaz uma amizade aceita entre o usuário logado e o usuário informado
 @login_required
-@require_POST
+@require_http_methods(['DELETE'])
 def friend_remove(request, user_id):
     friend_user = get_object_or_404(CustomUser, pk=user_id)
     deleted_count, _ = Friendship.objects.filter(
@@ -215,7 +216,7 @@ def friend_remove(request, user_id):
         messages.success(request, f'{friend_user.username} foi removido da sua lista de amigos.')
     else:
         messages.info(request, 'Amizade não encontrada.')
-    return redirect('friends_list')
+    return redirect_after_action(request, 'friends_list')
 
 
 # GET: relatórios gerais do sistema, restritos ao admin geral (superusuário)

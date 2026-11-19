@@ -1,8 +1,19 @@
+from urllib.parse import urlencode
+
 from django.test import TestCase
 from django.urls import reverse
 
 from .admin import CustomUserChangeForm, CustomUserCreationForm
 from .models import CustomUser, Friendship
+
+
+def send_form(client, method, url, data=None, **kwargs):
+    return getattr(client, method.lower())(
+        url,
+        urlencode(data or {}),
+        content_type='application/x-www-form-urlencoded',
+        **kwargs,
+    )
 
 
 class CustomUserModelTests(TestCase):
@@ -236,6 +247,24 @@ class AuthenticationFlowTests(TestCase):
 
         self.assertRedirects(response, "/")
 
+    def test_perfil_atualiza_por_put_e_rejeita_post(self):
+        self.client.force_login(self.usuario)
+        url = reverse('perfil')
+        data = {
+            'first_name': 'Nome atualizado',
+            'last_name': 'Sobrenome atualizado',
+            'email': 'atualizado@example.com',
+        }
+
+        response = send_form(self.client, 'PUT', url, data)
+        self.assertRedirects(response, url, status_code=303)
+        self.usuario.refresh_from_db()
+        self.assertEqual(self.usuario.first_name, 'Nome atualizado')
+        self.assertEqual(self.usuario.last_name, 'Sobrenome atualizado')
+        self.assertEqual(self.usuario.email, 'atualizado@example.com')
+
+        self.assertEqual(self.client.post(url, data).status_code, 405)
+
 
 class FriendshipFlowTests(TestCase):
     def setUp(self):
@@ -255,12 +284,16 @@ class FriendshipFlowTests(TestCase):
         self.client.force_login(self.bob)
         response = self.client.get(self.friends_url)
         self.assertContains(response, 'alice')
-        response = self.client.post(
-            reverse('friend_request_action', args=[friendship.pk]),
+        action_url = reverse('friend_request_action', args=[friendship.pk])
+        self.assertEqual(self.client.post(action_url, {'action': 'accept'}).status_code, 405)
+        response = send_form(
+            self.client,
+            'PUT',
+            action_url,
             {'action': 'accept'},
         )
 
-        self.assertRedirects(response, self.friends_url)
+        self.assertRedirects(response, self.friends_url, status_code=303)
         friendship.refresh_from_db()
         self.assertEqual(friendship.status, Friendship.STATUS_ACCEPTED)
 
@@ -289,7 +322,9 @@ class FriendshipFlowTests(TestCase):
         )
         self.client.force_login(self.bob)
 
-        response = self.client.post(
+        response = send_form(
+            self.client,
+            'DELETE',
             reverse('friend_request_action', args=[friendship.pk]),
             {'action': 'decline'},
         )
@@ -297,7 +332,7 @@ class FriendshipFlowTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertTrue(Friendship.objects.filter(pk=friendship.pk).exists())
 
-    def test_tela_lista_amigos_e_remocao_exigem_login_e_post(self):
+    def test_tela_lista_amigos_e_remocao_exigem_login_e_delete(self):
         self.client.force_login(self.alice)
         friendship = Friendship.objects.create(
             from_user=self.alice,
@@ -309,6 +344,28 @@ class FriendshipFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'bob')
 
-        response = self.client.post(reverse('friend_remove', args=[self.bob.pk]))
-        self.assertRedirects(response, self.friends_url)
+        remove_url = reverse('friend_remove', args=[self.bob.pk])
+        self.assertEqual(self.client.post(remove_url).status_code, 405)
+        response = send_form(self.client, 'DELETE', remove_url)
+        self.assertRedirects(response, self.friends_url, status_code=303)
+        self.assertFalse(Friendship.objects.filter(pk=friendship.pk).exists())
+
+    def test_solicitacao_pode_ser_recusada_ou_cancelada_com_delete(self):
+        friendship = Friendship.objects.create(from_user=self.alice, to_user=self.bob)
+        self.client.force_login(self.bob)
+        response = send_form(
+            self.client, 'DELETE',
+            reverse('friend_request_action', args=[friendship.pk]),
+            {'action': 'reject'},
+        )
+        self.assertRedirects(response, self.friends_url, status_code=303)
+        self.assertFalse(Friendship.objects.filter(pk=friendship.pk).exists())
+
+        friendship = Friendship.objects.create(from_user=self.alice, to_user=self.bob)
+        self.client.force_login(self.alice)
+        send_form(
+            self.client, 'DELETE',
+            reverse('friend_request_action', args=[friendship.pk]),
+            {'action': 'cancel'},
+        )
         self.assertFalse(Friendship.objects.filter(pk=friendship.pk).exists())

@@ -15,9 +15,9 @@
 </header>
 {% include 'expenses/group_messages.html' %}
 
-{# POST: atualiza nome, sobrenome e e-mail #}
+{# PUT: atualiza nome, sobrenome e e-mail #}
 <section class="se-groups-panel se-group-form-panel">
-    <form method="post" class="se-group-form">
+    <form method="post" data-method="PUT" class="se-group-form">
         {% csrf_token %}
         {{ form.non_field_errors }}
         {% for field in form %}

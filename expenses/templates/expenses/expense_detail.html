@@ -20,7 +20,7 @@
     <article class="se-groups-panel se-detail-balance"><div><p>Seu status</p>{% if user_status == 'Paga' %}<span class="se-detail-badge se-detail-success">Paga (R$ {{ user_split.amount_owed|floatformat:2 }})</span>{% elif user_status == 'A pagar' %}<span class="se-detail-badge se-detail-warning">A pagar (R$ {{ user_split.amount_owed|floatformat:2 }})</span>{% elif user_status == 'Cota própria' %}<span class="se-detail-badge se-detail-success">Cota própria (R$ {{ user_split.amount_owed|floatformat:2 }})</span>{% else %}<span class="se-detail-badge">Não participa</span>{% endif %}</div></article>
 </div>
 {% if request.user.pk == expense.paid_by_id and remaining_total > 0 %}<p class="se-expense-muted">Você adiantou R$ {{ remaining_total|floatformat:2 }} aos demais.</p>{% endif %}
-{# Divisões: o botão alterna o status por POST (verde = paga, vermelho = a pagar) #}
+{# Divisões: o botão alterna o status por PUT (verde = paga, vermelho = a pagar) #}
 <section class="se-groups-panel se-detail-panel" aria-labelledby="splits-title">
     <div class="se-detail-panel-heading"><h2 id="splits-title">Divisões entre participantes</h2></div>
     <div class="se-detail-table-wrap"><table class="se-detail-table">
@@ -29,7 +29,7 @@
             <td>{{ row.split.user.username }}</td><td><strong>R$ {{ row.split.amount_owed|floatformat:2 }}</strong></td>
             <td>{% if row.split.user_id == expense.paid_by_id %}<span class="se-detail-badge se-detail-success">Cota própria</span>{% elif row.split.is_paid %}<span class="se-detail-badge se-detail-success">Paga</span>{% else %}<span class="se-detail-badge se-detail-warning">A pagar</span>{% endif %}</td>
             <td>{% if row.split.user_id == expense.paid_by_id %}<span class="se-expense-muted">—</span>{% elif row.can_toggle %}
-                <form method="post" action="{% url 'split_toggle_paid' row.split.pk %}">{% csrf_token %}
+                <form method="post" data-method="PUT" action="{% url 'split_toggle_paid' row.split.pk %}">{% csrf_token %}
                     <input type="hidden" name="next" value="{{ request.path }}">
                     {% if row.split.is_paid %}
                     <button type="submit" class="se-btn-soft se-btn-soft-danger"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Marcar como A pagar</button>
