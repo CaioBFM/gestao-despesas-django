@@ -17,4 +17,7 @@ urlpatterns = [
     path('expenses/<int:pk>/edit/', views.expense_update, name='expense_update'),
     path('expenses/<int:pk>/delete/', views.expense_delete, name='expense_delete'),
     path('splits/<int:split_id>/toggle-paid/', views.split_toggle_paid, name='split_toggle_paid'),
+    path('history/', views.personal_history, name='personal_history'),
+
+    path('<int:pk>/add-friend/', views.group_add_friend, name='group_add_friend'),
 ]

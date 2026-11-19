@@ -25,3 +25,13 @@ class UserProfileForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs['class'] = 'form-control'
+
+class AddFriendForm(forms.Form):
+    username = forms.CharField(
+        label='Nome de usuário (username)',
+        max_length=150,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ex: fabio',
+        }),
+    )
