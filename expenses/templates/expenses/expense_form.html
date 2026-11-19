@@ -4,7 +4,17 @@
 {% block pagina_titulo %}Despesas{% endblock %}
 {% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}"><link rel="stylesheet" href="{% static 'css/expenses.css' %}">{% endblock %}
 {% block conteudo %}
+{% if is_edit %}
+<a href="{% url 'expense_detail' expense.pk %}" class="se-detail-back">
+    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Voltar para a despesa
+</a>
+{% else %}
+<a href="{% url 'group_detail' group.pk %}" class="se-detail-back">
+    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Voltar ao grupo
+</a>
+{% endif %}
 {% include 'expenses/group_messages.html' %}
+{# Painel do formulário de despesa #}
 <div class="se-groups-panel se-expense-form-panel">
                 <h1 class="se-expense-form-title">
                     <i class="fas fa-receipt me-2"></i>
@@ -12,7 +22,8 @@
                 </h1>
                 <p class="se-expense-muted mb-4">Grupo: <strong>{{ group.name }}</strong></p>
 
-                <form method="post" id="expense-form" class="se-expense-form">
+                {# POST cria a despesa; PUT atualiza a existente #}
+                <form method="post" data-method="{% if is_edit %}PUT{% else %}POST{% endif %}" id="expense-form" class="se-expense-form">
                     {{ form.non_field_errors }}
                     {% csrf_token %}
 
@@ -46,6 +57,7 @@
                         </div>
                     </div>
 
+                    {# Divisão entre participantes #}
                     <div class="se-expense-split-heading">
                         <h5 class="mb-0">Participantes e Valores Específicos</h5>
                         <button type="button" class="se-groups-button se-groups-button-secondary" onclick="splitEqually()">
@@ -54,21 +66,13 @@
                     </div>
                     <p class="se-expense-muted">Marque quem participa da divisão e informe o valor devido por cada pessoa.</p>
 
-                    <div class="mb-3">
-                        <label for="split-mode" class="form-label">Modo de divisão</label>
-                        <select id="split-mode" name="split_mode" class="form-select">
-                            <option value="value" {% if split_mode == 'value' %}selected{% endif %}>Valor (R$)</option>
-                            <option value="percentage" {% if split_mode == 'percentage' %}selected{% endif %}>Porcentagem (%)</option>
-                        </select>
-                    </div>
-
                     <div class="se-detail-table-wrap se-expense-split-table">
                         <table class="se-detail-table">
                             <thead>
                                 <tr>
                                     <th style="width: 90px;">Participa</th>
                                     <th>Membro</th>
-                                    <th style="width: 200px;" id="split-heading">Valor devido</th>
+                                    <th style="width: 200px;">Valor devido (R$)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -121,32 +125,32 @@
                 </form>
 </div>
 
+{# Cálculo da divisão em reais feito no navegador #}
 <script>
-const splitMode = document.getElementById('split-mode');
 const totalInput = document.getElementById('id_amount');
 const checkboxes = document.querySelectorAll('.split-checkbox');
 
+// Campos de valor dos participantes marcados
 function selectedInputs() {
     return Array.from(checkboxes).filter(chk => chk.checked)
         .map(chk => chk.closest('tr').querySelector('.split-amount'));
 }
 
+// Atualiza o total distribuído e o aviso de divergência
 function updateSplitTotal() {
-    const percentage = splitMode.value === 'percentage';
     const sum = selectedInputs().reduce((total, input) => total + (Number(input.value.replace(',', '.')) || 0), 0);
-    const target = percentage ? 100 : Number(totalInput.value) || 0;
-    document.getElementById('split-heading').textContent = percentage ? 'Percentual (%)' : 'Valor devido (R$)';
-    document.getElementById('split-total').textContent = percentage
-        ? `Percentual acumulado: ${sum.toFixed(2)}% — Total distribuído aproximado: R$ ${((Number(totalInput.value) || 0) * sum / 100).toFixed(2)}` : `Total distribuído: R$ ${sum.toFixed(2)}`;
+    const target = Number(totalInput.value) || 0;
+    document.getElementById('split-total').textContent = `Total distribuído: R$ ${sum.toFixed(2)}`;
     document.getElementById('split-warning').textContent = Math.abs(sum - target) > 0.000001
-        ? (percentage ? 'A soma dos percentuais deve ser exatamente 100%.' : 'A soma das divisões deve ser igual ao valor total.') : '';
+        ? 'A soma das divisões deve ser igual ao valor total.' : '';
 }
 
+// Divide o total igualmente entre os participantes marcados
 function splitEqually() {
     const inputs = selectedInputs();
-    const total = splitMode.value === 'percentage' ? 100 : Number(totalInput.value);
+    const total = Number(totalInput.value);
     if (!inputs.length || !Number.isFinite(total) || total <= 0) {
-        alert('Informe o valor total e selecione ao menos um participante.');
+        SEModal.alert('Informe o valor total e selecione ao menos um participante.', 'Dados incompletos');
         return;
     }
     const units = Math.round(total * 100);
@@ -157,7 +161,6 @@ function splitEqually() {
 }
 
 document.getElementById('expense-form').addEventListener('input', updateSplitTotal);
-splitMode.addEventListener('change', updateSplitTotal);
 updateSplitTotal();
 </script>
 {% endblock %}

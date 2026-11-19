@@ -65,6 +65,18 @@ a.se-group-card:hover { transform: translateY(-3px); border-color: var(--se-prim
 .se-detail-panel { margin-bottom: 20px; overflow: hidden; }
 .se-detail-panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 22px; border-bottom: 1px solid var(--se-border); }
 .se-detail-panel h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.se-detail-panel-body { padding: 28px; }
+.se-friend-add-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 16px; }
+.se-friend-add-form .se-group-field { margin: 0; }
+.se-friend-add-form .se-groups-button { min-height: 42px; }
+.se-friend-actions { flex-wrap: wrap; }
+.se-friend-actions form, .se-friend-inline-form { margin: 0; }
+.se-friend-inline-form { display: inline-flex; }
+.se-add-friend-form { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; }
+.se-add-friend-field { width: 100%; max-width: 680px; }
+.se-add-friend-field label { display: block; margin-bottom: 10px; color: var(--se-text); font-size: 13px; font-weight: 600; }
+.se-add-friend-field .form-select { width: 100%; min-height: 44px; background-color: var(--se-surface-2); border-color: var(--se-border); color: var(--se-text); }
+.se-add-friend-empty { margin: 0; }
 .se-participant-balances { margin: 0; padding: 0; list-style: none; }
 .se-participant-balance { padding: 15px 22px; border-bottom: 1px solid var(--se-border); color: var(--se-muted); font-size: 13px; overflow-wrap: anywhere; }
 .se-participant-balance:last-child { border-bottom: 0; }
@@ -98,4 +110,7 @@ a.se-group-card:hover { transform: translateY(-3px); border-color: var(--se-prim
     .se-detail-panel-heading { align-items: flex-start; flex-wrap: wrap; }
     .se-detail-balance { padding: 16px; }
     .se-detail-admin-form .se-groups-button { grid-column: auto; }
+    .se-detail-panel-body { padding: 22px; }
+    .se-friend-add-form { grid-template-columns: 1fr; }
+    .se-friend-add-form .se-groups-button, .se-add-friend-form .se-groups-button { justify-self: start; }
 }

@@ -1,10 +1,14 @@
 from decimal import Decimal, InvalidOperation
 from django.shortcuts import render, redirect, get_object_or_404
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import F, Q
+from django.db.models import F, Q, Sum
+
+from accounts.models import CustomUser
+from accounts.services import are_friends, get_friends_queryset
+from gestao_despesas.http import get_request_data, redirect_after_action
 from .models import Group, GroupMembership, Expense, ExpenseSplit
 from .forms import GroupForm, JoinGroupForm, ExpenseForm, parse_splits_from_post
 from .services import calculate_participant_balances
@@ -85,6 +89,7 @@ def _extract_post_total_amount(post_data, form):
 
 
 @login_required
+@require_GET
 def group_list(request):
     user_groups = Group.objects.filter(
         groupmembership__user=request.user,
@@ -96,6 +101,7 @@ def group_list(request):
 
 
 @login_required
+@require_http_methods(['GET', 'POST'])
 def group_create(request):
     if request.method == 'POST':
         form = GroupForm(request.POST)
@@ -111,6 +117,7 @@ def group_create(request):
 
 
 @login_required
+@require_POST
 def group_join(request):
     if request.method == 'POST':
         form = JoinGroupForm(request.POST)
@@ -151,6 +158,7 @@ def group_join(request):
 
 
 @login_required
+@require_http_methods(['GET', 'PUT'])
 def group_detail(request, pk):
     group = get_object_or_404(Group, pk=pk, is_active=True)
     membership = _get_accepted_membership(request.user, group)
@@ -161,21 +169,38 @@ def group_detail(request, pk):
 
     user_is_group_admin = bool(membership and membership.is_accepted and membership.is_group_admin)
 
-    if request.method == 'POST' and user_is_group_admin:
-        action = request.POST.get('action')
+    if request.method == 'PUT':
+        if not user_is_group_admin:
+            messages.error(request, 'Apenas administradores do grupo podem editar suas informações.')
+            return redirect_after_action(request, 'group_detail', pk=group.pk)
+        data = get_request_data(request)
+        action = data.get('action')
         if action == 'update_info':
-            group.description = request.POST.get('description', group.description)
-            new_code = request.POST.get('invite_code', '').upper().strip()
-            if new_code and new_code != group.invite_code:
-                if Group.objects.filter(invite_code=new_code).exists():
-                    messages.error(request, 'Este código de convite já está em uso por outro grupo.')
-                else:
-                    group.invite_code = new_code
-                    messages.success(request, 'Código de convite alterado com sucesso!')
-            group.save()
-            return redirect('group_detail', pk=group.pk)
+            form = GroupForm(data, instance=group)
+            new_code = data.get('invite_code', '').upper().strip()
+            if not form.is_valid():
+                messages.error(request, 'Informe um título válido para o grupo.')
+            elif not new_code:
+                messages.error(request, 'O código de convite não pode ficar vazio.')
+            elif len(new_code) > 10:
+                messages.error(request, 'O código de convite deve ter no máximo 10 caracteres.')
+            elif Group.objects.filter(invite_code=new_code).exclude(pk=group.pk).exists():
+                messages.error(request, 'Este código de convite já está em uso por outro grupo.')
+            else:
+                group = form.save(commit=False)
+                group.invite_code = new_code
+                group.save()
+                messages.success(request, 'Informações do grupo atualizadas com sucesso.')
+        else:
+            messages.error(request, 'Ação inválida para atualizar o grupo.')
+        return redirect_after_action(request, 'group_detail', pk=group.pk)
 
     members = GroupMembership.objects.filter(group=group).select_related('user')
+    existing_member_ids = set(members.values_list('user_id', flat=True))
+    addable_friends = (
+        get_friends_queryset(request.user).exclude(pk__in=existing_member_ids)
+        if user_is_group_admin else []
+    )
     is_only_member = bool(membership and not members.exclude(pk=membership.pk).exists())
     leave_blocked = bool(membership and not is_only_member and _is_last_group_admin(membership))
 
@@ -212,7 +237,9 @@ def group_detail(request, pk):
     return render(request, 'expenses/group_detail.html', {
         'group': group,
         'members': members,
+        'addable_friends': addable_friends,
         'is_admin': user_is_group_admin,
+        'is_member': membership is not None,
         'is_only_member': is_only_member,
         'leave_blocked': leave_blocked,
         'expense_items': expense_items,
@@ -223,7 +250,7 @@ def group_detail(request, pk):
 
 
 @login_required
-@require_POST
+@require_http_methods(['PUT', 'DELETE'])
 def member_action(request, group_id, membership_id):
     group = get_object_or_404(Group, pk=group_id)
     user_membership = _get_accepted_membership(request.user, group)
@@ -233,24 +260,31 @@ def member_action(request, group_id, membership_id):
         return redirect('group_detail', pk=group.pk)
 
     target_membership = get_object_or_404(GroupMembership, pk=membership_id, group=group)
-    action = request.POST.get('action')
+    data = get_request_data(request)
+    action = data.get('action')
 
-    if action == 'accept':
-        target_membership.is_accepted = True
-        target_membership.save()
-        messages.success(request, f'Membro {target_membership.user.username} aceito no grupo.')
-    elif action == 'promote':
-        target_membership.is_group_admin = True
-        target_membership.save()
-        messages.success(request, f'Membro {target_membership.user.username} promovido a administrador.')
-    elif action == 'demote':
+    if request.method == 'PUT' and action == 'accept':
+        if target_membership.is_accepted:
+            messages.info(request, f'{target_membership.user.username} já faz parte do grupo.')
+        else:
+            target_membership.is_accepted = True
+            target_membership.save()
+            messages.success(request, f'Membro {target_membership.user.username} aceito no grupo.')
+    elif request.method == 'PUT' and action == 'promote':
+        if not target_membership.is_accepted:
+            messages.error(request, 'Aceite o pedido de entrada antes de promover o membro.')
+        else:
+            target_membership.is_group_admin = True
+            target_membership.save()
+            messages.success(request, f'Membro {target_membership.user.username} promovido a administrador.')
+    elif request.method == 'PUT' and action == 'demote':
         if _is_last_group_admin(target_membership):
             messages.error(request, 'O último administrador não pode perder o cargo.')
         else:
             target_membership.is_group_admin = False
             target_membership.save()
             messages.success(request, f'Membro {target_membership.user.username} rebaixado a usuário comum.')
-    elif action == 'kick':
+    elif request.method == 'DELETE' and action == 'kick':
         if _is_last_group_admin(target_membership):
             messages.error(request, 'O último administrador não pode ser removido.')
         elif _has_pending_obligations(group, target_membership.user):
@@ -258,41 +292,45 @@ def member_action(request, group_id, membership_id):
         else:
             target_membership.delete()
             messages.success(request, 'Membro removido do grupo.')
+    else:
+        messages.error(request, 'A ação solicitada não corresponde ao método HTTP utilizado.')
 
-    return redirect('group_detail', pk=group.pk)
+    return redirect_after_action(request, 'group_detail', pk=group.pk)
 
 
 @login_required
-@require_POST
+@require_http_methods(['DELETE'])
 @transaction.atomic
 def group_leave(request, pk):
     group = get_object_or_404(Group.objects.select_for_update(), pk=pk)
     membership = get_object_or_404(GroupMembership, user=request.user, group=group)
+    data = get_request_data(request)
 
     if not GroupMembership.objects.filter(group=group).exclude(pk=membership.pk).exists():
         if _has_pending_obligations(group):
             messages.warning(request, 'Há pendências financeiras que precisam ser quitadas antes da saída e exclusão do grupo.')
-            return redirect('group_detail', pk=group.pk)
-        if request.POST.get('confirm_delete') != 'yes':
+            return redirect_after_action(request, 'group_detail', pk=group.pk)
+        if data.get('confirm_delete') != 'yes':
             messages.warning(request, 'Confirme a exclusão permanente do grupo e de todas as despesas para sair.')
-            return redirect('group_detail', pk=group.pk)
+            return redirect_after_action(request, 'group_detail', pk=group.pk)
         group.delete()
         messages.success(request, 'Você saiu do grupo. O grupo e todos os dados associados foram excluídos permanentemente.')
-        return redirect('group_list')
+        return redirect_after_action(request, 'group_list')
 
     if _is_last_group_admin(membership):
         messages.warning(request, 'Você é o último administrador deste grupo. Promova outro participante a administrador antes de sair.')
-        return redirect('group_detail', pk=group.pk)
+        return redirect_after_action(request, 'group_detail', pk=group.pk)
     elif _has_pending_obligations(group, request.user):
         messages.warning(request, 'Há pendências financeiras que precisam ser quitadas antes da saída do grupo.')
-        return redirect('group_detail', pk=group.pk)
+        return redirect_after_action(request, 'group_detail', pk=group.pk)
     else:
         membership.delete()
         messages.success(request, 'Você saiu do grupo com sucesso.')
-    return redirect('group_list')
+    return redirect_after_action(request, 'group_list')
 
 
 @login_required
+@require_GET
 def expense_list_all(request):
     user_groups = Group.objects.filter(
         groupmembership__user=request.user,
@@ -316,6 +354,7 @@ def expense_list_all(request):
 
 
 @login_required
+@require_http_methods(['GET', 'POST'])
 def expense_create(request, group_id):
     group = get_object_or_404(Group, pk=group_id, is_active=True)
     membership = _get_accepted_membership(request.user, group)
@@ -377,12 +416,12 @@ def expense_create(request, group_id):
         'form': form,
         'group': group,
         'participant_rows': participant_rows,
-        'split_mode': request.POST.get('split_mode', 'value'),
         'is_edit': False,
     })
 
 
 @login_required
+@require_GET
 def expense_detail(request, pk):
     expense = get_object_or_404(
         Expense.objects.select_related('group', 'paid_by', 'created_by').prefetch_related('splits__user'),
@@ -426,6 +465,7 @@ def expense_detail(request, pk):
 
 
 @login_required
+@require_http_methods(['GET', 'PUT'])
 def expense_update(request, pk):
     expense = get_object_or_404(
         Expense.objects.select_related('group', 'paid_by', 'created_by').prefetch_related('splits__user'),
@@ -436,18 +476,19 @@ def expense_update(request, pk):
 
     if not _can_manage_expense(request.user, expense, group, membership):
         messages.error(request, 'Apenas o criador da despesa, quem pagou ou administradores podem editá-la.')
-        return redirect('expense_detail', pk=expense.pk)
+        return redirect_after_action(request, 'expense_detail', pk=expense.pk)
 
     accepted_memberships = list(
         GroupMembership.objects.filter(group=group, is_accepted=True).select_related('user')
     )
     existing_splits_map = {s.user_id: s for s in expense.splits.all()}
 
-    if request.method == 'POST':
-        form = ExpenseForm(request.POST, instance=expense, group=group)
-        total_amount = _extract_post_total_amount(request.POST, form)
+    if request.method == 'PUT':
+        data = get_request_data(request)
+        form = ExpenseForm(data, instance=expense, group=group)
+        total_amount = _extract_post_total_amount(data, form)
         splits_data, split_errors = parse_splits_from_post(
-            request.POST, accepted_memberships, total_amount=total_amount
+            data, accepted_memberships, total_amount=total_amount
         )
 
         if form.is_valid() and not split_errors:
@@ -475,13 +516,13 @@ def expense_update(request, pk):
                             )
 
                 messages.success(request, f'Despesa "{updated_expense.title}" atualizada com sucesso!')
-                return redirect('expense_detail', pk=updated_expense.pk)
+                return redirect_after_action(request, 'expense_detail', pk=updated_expense.pk)
             except Exception as exc:
                 messages.error(request, f'Erro ao atualizar despesa: {exc}')
         else:
             for err in split_errors:
                 messages.error(request, err)
-                
+
     else:
         form = ExpenseForm(instance=expense, group=group)
         splits_data = {uid: s.amount_owed for uid, s in existing_splits_map.items()}
@@ -489,9 +530,9 @@ def expense_update(request, pk):
     participant_rows = []
     for m in accepted_memberships:
         uid = m.user_id
-        if request.method == 'POST':
-            is_checked = request.POST.get(f'split_participates_{uid}') == 'on'
-            amount_str = request.POST.get(f'split_amount_{uid}', '')
+        if request.method == 'PUT':
+            is_checked = data.get(f'split_participates_{uid}') == 'on'
+            amount_str = data.get(f'split_amount_{uid}', '')
         else:
             is_checked = uid in existing_splits_map
             amount_val = existing_splits_map[uid].amount_owed if uid in existing_splits_map else None
@@ -508,12 +549,12 @@ def expense_update(request, pk):
         'group': group,
         'expense': expense,
         'participant_rows': participant_rows,
-        'split_mode': request.POST.get('split_mode', 'value'),
         'is_edit': True,
     })
 
 
 @login_required
+@require_http_methods(['GET', 'DELETE'])
 def expense_delete(request, pk):
     expense = get_object_or_404(Expense.objects.select_related('group', 'paid_by', 'created_by'), pk=pk)
     group = expense.group
@@ -521,13 +562,13 @@ def expense_delete(request, pk):
 
     if not _can_manage_expense(request.user, expense, group, membership):
         messages.error(request, 'Apenas o criador da despesa, quem pagou ou administradores podem excluí-la.')
-        return redirect('expense_detail', pk=expense.pk)
+        return redirect_after_action(request, 'expense_detail', pk=expense.pk)
 
-    if request.method == 'POST':
+    if request.method == 'DELETE':
         title = expense.title
         expense.delete()
         messages.success(request, f'Despesa "{title}" excluída com sucesso.')
-        return redirect('group_detail', pk=group.pk)
+        return redirect_after_action(request, 'group_detail', pk=group.pk)
 
     return render(request, 'expenses/expense_confirm_delete.html', {
         'expense': expense,
@@ -536,10 +577,9 @@ def expense_delete(request, pk):
 
 
 @login_required
+@require_http_methods(['PUT'])
 def split_toggle_paid(request, split_id):
-    if request.method != 'POST':
-        return redirect('group_list')
-
+    data = get_request_data(request)
     split = get_object_or_404(
         ExpenseSplit.objects.select_related('expense__group', 'expense__paid_by', 'expense__created_by', 'user'),
         pk=split_id
@@ -550,7 +590,7 @@ def split_toggle_paid(request, split_id):
 
     if not _can_toggle_split(request.user, split, membership):
         messages.error(request, 'Você não tem permissão para alterar o pagamento desta divisão.')
-        return redirect('expense_detail', pk=expense.pk)
+        return redirect_after_action(request, 'expense_detail', pk=expense.pk)
 
     split.is_paid = not split.is_paid
     split.save()
@@ -558,7 +598,94 @@ def split_toggle_paid(request, split_id):
     status_txt = 'Paga' if split.is_paid else 'A pagar'
     messages.success(request, f'Divisão de {split.user.username} marcada como "{status_txt}".')
 
-    next_url = request.POST.get('next')
+    next_url = data.get('next')
     if next_url and next_url.startswith('/'):
-        return redirect(next_url)
-    return redirect('expense_detail', pk=expense.pk)
+        return redirect_after_action(request, next_url)
+    return redirect_after_action(request, 'expense_detail', pk=expense.pk)
+
+
+@login_required
+@require_POST
+def group_add_friend(request, pk):
+    group = get_object_or_404(Group, pk=pk, is_active=True)
+    user_membership = _get_accepted_membership(request.user, group)
+
+    if not (user_membership and user_membership.is_accepted and user_membership.is_group_admin):
+        messages.error(request, 'Apenas administradores do grupo podem adicionar amigos diretamente.')
+        return redirect('group_detail', pk=group.pk)
+
+    friend_id = request.POST.get('friend_id')
+    friend = get_object_or_404(CustomUser, pk=friend_id, is_active=True)
+
+    if not are_friends(request.user, friend):
+        messages.error(request, f'{friend.username} não está na sua lista de amigos.')
+        return redirect('group_detail', pk=group.pk)
+
+    membership, created = GroupMembership.objects.get_or_create(
+        group=group,
+        user=friend,
+        defaults={
+            'is_accepted': True,
+            'is_group_admin': False,
+        },
+    )
+    if not created:
+        if membership.is_accepted:
+            messages.info(request, f'{friend.username} já faz parte do grupo.')
+        else:
+            membership.is_accepted = True
+            membership.save(update_fields=['is_accepted'])
+            messages.success(request, f'{friend.username} foi adicionado ao grupo e já está ativo!')
+    else:
+        messages.success(request, f'{friend.username} foi adicionado ao grupo diretamente!')
+
+    return redirect('group_detail', pk=group.pk)
+
+
+@login_required
+@require_GET
+def personal_history(request):
+    status_filter = request.GET.get('status', 'all')
+    if status_filter not in ('all', 'pending', 'paid'):
+        status_filter = 'all'
+
+    user_splits_qs = (
+        ExpenseSplit.objects.filter(user=request.user)
+        .exclude(expense__paid_by=request.user)
+        .select_related('expense', 'expense__group', 'expense__paid_by')
+        .order_by('-expense__date', '-expense__created_at', '-pk')
+    )
+
+    total_to_pay = (
+        user_splits_qs.filter(is_paid=False)
+        .aggregate(total=Sum('amount_owed', default=Decimal('0.00')))['total']
+    )
+    total_paid_by_me = (
+        user_splits_qs.filter(is_paid=True)
+        .aggregate(total=Sum('amount_owed', default=Decimal('0.00')))['total']
+    )
+    expenses_paid_by_me = (
+        Expense.objects.filter(paid_by=request.user)
+        .select_related('group')
+        .order_by('-date', '-created_at', '-pk')
+    )
+    total_expenses_paid_by_me = (
+        expenses_paid_by_me.aggregate(total=Sum('amount'))['total']
+        or Decimal('0.00')
+    )
+
+    if status_filter == 'pending':
+        filtered_splits = user_splits_qs.filter(is_paid=False)
+    elif status_filter == 'paid':
+        filtered_splits = user_splits_qs.filter(is_paid=True)
+    else:
+        filtered_splits = user_splits_qs
+
+    return render(request, 'expenses/personal_history.html', {
+        'splits': filtered_splits,
+        'status_filter': status_filter,
+        'total_to_pay': total_to_pay,
+        'total_paid_by_me': total_paid_by_me,
+        'expenses_paid_by_me': expenses_paid_by_me,
+        'total_expenses_paid_by_me': total_expenses_paid_by_me,
+    })
