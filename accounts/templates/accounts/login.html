@@ -1,63 +1,40 @@
+{% extends "accounts/auth_base.html" %}
 
-{% extends "base.html" %}
+{% block titulo %}Login — SplitExpenses{% endblock %}
 
-{% block titulo %}Login - SplitExpenses{% endblock %}
+{% block auth_content %}
+<div class="se-auth-form-panel">
+  <div class="se-auth-heading">
+    <span class="se-auth-eyebrow">SUA CONTA</span>
+    <h1>Login</h1>
+    <p>Acesse sua conta no SplitExpenses.</p>
+  </div>
 
-{% block conteudo %}
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-4">
-        <div class="card shadow-sm">
-            <div class="card-body p-4">
-                <h2 class="text-center mb-4">Entrar</h2>
-
-                {% if form.errors %}
-                    <div class="alert alert-danger">
-                        Usuário ou senha inválidos.
-                    </div>
-                {% endif %}
-
-                <form method="post">
-                    {% csrf_token %}
-
-                    <div class="mb-3">
-                        <label for="username" class="form-label">
-                            Usuário
-                        </label>
-                        <input type="text"
-                               name="username"
-                               id="username"
-                               class="form-control"
-                               autocomplete="username"
-                               required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="password" class="form-label">
-                            Senha
-                        </label>
-                        <input type="password"
-                               name="password"
-                               id="password"
-                               class="form-control"
-                               autocomplete="current-password"
-                               required>
-                    </div>
-
-                    {% if next %}
-                        <input type="hidden" name="next" value="{{ next }}">
-                    {% endif %}
-
-                    <button type="submit" class="btn btn-primary w-100">
-                        Entrar
-                    </button>
-                </form>
-
-                <p class="text-center mt-3 mb-0">
-                    Não possui conta?
-                    <a href="{% url 'cadastro' %}">Cadastre-se</a>
-                </p>
-            </div>
-        </div>
+  {% if form.errors %}
+    <div class="se-auth-alert" role="alert">
+      Não foi possível entrar. Confira seu usuário e sua senha.
     </div>
+  {% endif %}
+
+  <form method="post" action="{% url 'login' %}" class="se-login-form">
+    {% csrf_token %}
+    <div class="se-auth-field">
+      <label for="login-username">Usuário</label>
+      <input id="login-username" name="username" type="text" autocomplete="username"
+             placeholder="Digite seu usuário" value="{{ form.username.value|default_if_none:'' }}" required autofocus>
+      {% for error in form.username.errors %}<small class="se-field-error">{{ error }}</small>{% endfor %}
+    </div>
+    <div class="se-auth-field">
+      <label for="login-password">Senha</label>
+      <input id="login-password" name="password" type="password" autocomplete="current-password"
+             placeholder="Digite sua senha" required>
+      {% for error in form.password.errors %}<small class="se-field-error">{{ error }}</small>{% endfor %}
+    </div>
+
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+    <button class="se-btn-primary" type="submit">Entrar</button>
+    <p class="se-auth-switch">Ainda não tem conta? <a href="{% url 'cadastro' %}">Criar uma conta</a></p>
+  </form>
 </div>
 {% endblock %}

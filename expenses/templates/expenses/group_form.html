@@ -1,18 +1,27 @@
-{% extends 'base.html' %}
-{% block titulo %}Criar Grupo - SplitExpenses{% endblock %}
+{% extends 'app_base.html' %}
+{% load static %}
+{% block titulo %}Criar grupo - SplitExpenses{% endblock %}
+{% block pagina_titulo %}Grupos{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}">{% endblock %}
 {% block conteudo %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-body p-4">
-                <h2 class="mb-4">Criar Novo Grupo</h2>
-                <form method="post">
-                    {% csrf_token %}
-                    {{ form.as_p }}
-                    <button type="submit" class="btn btn-primary w-100">Criar Grupo</button>
-                </form>
-            </div>
+<header class="se-groups-heading"><div><h1>Criar grupo</h1><p>Crie um espaço para organizar despesas.</p></div></header>
+{% include 'expenses/group_messages.html' %}
+<section class="se-groups-panel se-group-form-panel">
+    <form method="post" class="se-group-form">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {% for field in form %}
+        <div class="se-group-field">
+            <label for="{{ field.id_for_label }}">{{ field.label }}{% if not field.field.required %} (opcional){% endif %}</label>
+            {{ field }}
+            {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+            {{ field.errors }}
         </div>
-    </div>
-</div>
+        {% endfor %}
+        <div class="se-group-actions">
+            <a href="{% url 'group_list' %}" class="se-groups-button se-groups-button-secondary">Voltar aos grupos</a>
+            <button type="submit" class="se-groups-button se-groups-button-primary">Criar grupo</button>
+        </div>
+    </form>
+</section>
 {% endblock %}

@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import F, Q
 from .models import Group, GroupMembership, Expense, ExpenseSplit
 from .forms import GroupForm, JoinGroupForm, ExpenseForm, parse_splits_from_post
+from .services import calculate_participant_balances
 
 
 def _get_accepted_membership(user, group):
@@ -53,6 +54,8 @@ def _can_manage_expense(user, expense, group, membership=None):
 
 
 def _can_toggle_split(user, split, membership):
+    if split.user_id == split.expense.paid_by_id:
+        return False
     return _can_manage_expense(user, split.expense, split.expense.group, membership) or bool(
         membership and membership.is_accepted and split.user_id == user.pk
     )
@@ -215,6 +218,7 @@ def group_detail(request, pk):
         'expense_items': expense_items,
         'total_group_amount': total_group_amount,
         'total_to_pay_by_user': total_to_pay_by_user,
+        'participant_balances': calculate_participant_balances(group, request.user),
     })
 
 

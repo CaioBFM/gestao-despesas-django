@@ -1,50 +1,34 @@
-{% extends 'base.html' %}
-{% block titulo %}Meus Grupos - SplitExpenses{% endblock %}
+{% extends 'app_base.html' %}
+{% load static %}
+{% block titulo %}Meus grupos - SplitExpenses{% endblock %}
+{% block pagina_titulo %}Grupos{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}">{% endblock %}
 {% block conteudo %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="fas fa-users me-2"></i>Meus Grupos</h2>
-    <div>
-        <a href="{% url 'group_create' %}" class="btn btn-primary"><i class="fas fa-plus me-1"></i> Criar Grupo</a>
-    </div>
-</div>
-
-<!-- Formulário para entrar via código -->
-<div class="card shadow-sm mb-4 bg-body-tertiary border-0">
-    <div class="card-body">
-        <form method="post" action="{% url 'group_join' %}" class="row g-3 align-items-center">
-            {% csrf_token %}
-            <div class="col-auto">
-                <label class="fw-bold">Possui um código de convite?</label>
-            </div>
-            <div class="col-auto">
-                {{ join_form.invite_code }}
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-outline-primary">Participar</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div class="row">
+<header class="se-groups-heading">
+    <div><h1>Meus grupos</h1><p>Organize despesas por ocasião ou convivência.</p></div>
+    <a href="{% url 'group_create' %}" class="se-groups-button se-groups-button-primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Criar grupo</a>
+</header>
+{% include 'expenses/group_messages.html' %}
+<section class="se-groups-panel se-join-panel" aria-labelledby="join-title">
+    <div><h2 id="join-title">Participar de um grupo</h2><p>Informe o código de convite enviado por um participante.</p></div>
+    <form method="post" action="{% url 'group_join' %}" class="se-join-form">
+        {% csrf_token %}
+        <label for="{{ join_form.invite_code.id_for_label }}" class="visually-hidden">Código de convite</label>
+        {{ join_form.invite_code }}
+        <button type="submit" class="se-groups-button se-groups-button-secondary"><i class="fa-solid fa-key" aria-hidden="true"></i> Participar</button>
+    </form>
+</section>
+<section class="se-groups-grid" aria-label="Meus grupos">
     {% for group in groups %}
-        <div class="col-md-4 mb-3">
-            <div class="card shadow-sm h-100">
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title fw-bold text-primary">{{ group.name }}</h5>
-                    <p class="card-text text-muted small flex-grow-1">{{ group.description|default:"Sem descrição informada." }}</p>
-                    <hr>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="badge bg-secondary">Código: {{ group.invite_code }}</span>
-                        <a href="{% url 'group_detail' group.pk %}" class="btn btn-sm btn-dark">Acessar</a>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <a href="{% url 'group_detail' group.pk %}" class="se-groups-panel se-group-card">
+        <span class="se-group-icon" aria-hidden="true"><i class="fa-solid fa-users"></i></span>
+        <h2>{{ group.name }}</h2>
+        <p class="se-group-description">{{ group.description|default:'Sem descrição informada.' }}</p>
+        <p class="se-group-code">Código de convite <strong>{{ group.invite_code }}</strong></p>
+        <span class="se-group-link">Acessar grupo <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
+    </a>
     {% empty %}
-        <div class="col-12 text-center py-5">
-            <p class="text-muted">Você ainda não participa de nenhum grupo ativo.</p>
-        </div>
+    <div class="se-groups-panel se-groups-empty"><i class="fa-regular fa-folder-open" aria-hidden="true"></i><p>Você ainda não participa de nenhum grupo ativo.</p></div>
     {% endfor %}
-</div>
+</section>
 {% endblock %}

@@ -386,7 +386,7 @@ class ExpenseAccessTests(TestCase):
         self.admin = CustomUser.objects.create_user(username='admin2')
         self.group = Group.objects.create(name='Grupo', created_by=self.admin)
         self.membership = GroupMembership.objects.create(group=self.group, user=self.owner, is_accepted=True)
-        self.expense = Expense.objects.create(group=self.group, paid_by=self.owner, created_by=self.owner, title='Compra', amount=Decimal('10.00'), date=date(2026, 11, 19))
+        self.expense = Expense.objects.create(group=self.group, paid_by=self.admin, created_by=self.owner, title='Compra', amount=Decimal('10.00'), date=date(2026, 11, 19))
         self.split = ExpenseSplit.objects.create(expense=self.expense, user=self.owner, amount_owed=Decimal('10.00'))
         self.client.force_login(self.owner)
 
@@ -403,7 +403,7 @@ class ExpenseAccessTests(TestCase):
             self.assertEqual(self.expense.title, 'Compra')
 
     def test_membro_autorizado_pode_editar_alterar_pagamento_e_excluir(self):
-        data = {'title': 'Alterada', 'amount': '10.00', 'date': '2026-11-19', 'paid_by': self.owner.pk, f'split_participates_{self.owner.pk}': 'on', f'split_amount_{self.owner.pk}': '10.00'}
+        data = {'title': 'Alterada', 'amount': '10.00', 'date': '2026-11-19', 'paid_by': self.admin.pk, f'split_participates_{self.owner.pk}': 'on', f'split_amount_{self.owner.pk}': '10.00'}
         self.client.post(reverse('expense_update', args=[self.expense.pk]), data)
         self.expense.refresh_from_db()
         self.assertEqual(self.expense.title, 'Alterada')
@@ -586,3 +586,155 @@ class ExpenseBalanceDisplayTests(TestCase):
         self.assertEqual(detail.context['remaining_total'], Decimal('0.00'))
         self.assertEqual(detail.context['paid_total'], Decimal('60.00'))
         self.assertEqual(detail.context['user_status'], 'Paga')
+
+    def test_cota_propria_nao_pode_ser_alterada_por_nenhum_usuario(self):
+        superuser = CustomUser.objects.create_superuser(username='balance_super', password='senha')
+        for user in (self.payer, self.debtor, superuser):
+            with self.subTest(user=user):
+                self.client.force_login(user)
+                detail = self.client.get(reverse('expense_detail', args=[self.expense.pk]))
+                self.assertNotContains(detail, reverse('split_toggle_paid', args=[self.own.pk]))
+                response = self.client.post(reverse('split_toggle_paid', args=[self.own.pk]))
+                self.assertEqual(response.status_code, 302)
+                self.own.refresh_from_db()
+                self.assertFalse(self.own.is_paid)
+        self.client.force_login(superuser)
+        self.client.post(reverse('split_toggle_paid', args=[self.pending.pk]))
+        self.pending.refresh_from_db()
+        self.assertTrue(self.pending.is_paid)
+
+    def test_adiantamento_aparece_apenas_ao_pagador_com_saldo_pendente(self):
+        self.client.force_login(self.payer)
+        response = self.client.get(reverse('expense_detail', args=[self.expense.pk]))
+        self.assertContains(response, 'Você adiantou R$ 35,00 aos demais')
+        self.assertContains(response, 'Voltar ao grupo', count=1)
+        self.client.force_login(self.debtor)
+        self.assertNotContains(self.client.get(reverse('expense_detail', args=[self.expense.pk])), 'Você adiantou')
+        self.pending.is_paid = True
+        self.pending.save()
+        self.client.force_login(self.payer)
+        self.assertNotContains(self.client.get(reverse('expense_detail', args=[self.expense.pk])), 'Você adiantou')
+
+    def test_formularios_mostram_somente_campos_obrigatorios(self):
+        self.client.force_login(self.payer)
+        for url in (reverse('expense_create', args=[self.group.pk]), reverse('expense_update', args=[self.expense.pk])):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(response, 'Título *')
+                self.assertContains(response, 'Valor Total (R$) *')
+                self.assertContains(response, 'Data do Gasto *')
+                self.assertContains(response, 'Quem Pagou *')
+                self.assertNotContains(response, 'Descrição *')
+
+
+class ParticipantBalanceTests(TestCase):
+    def setUp(self):
+        self.me = CustomUser.objects.create_user(username='balance_me')
+        self.alice = CustomUser.objects.create_user(username='balance_alice')
+        self.bob = CustomUser.objects.create_user(username='balance_bob')
+        self.carla = CustomUser.objects.create_user(username='balance_carla')
+        self.group = Group.objects.create(name='Balanço', created_by=self.me)
+        for user in (self.alice, self.bob, self.carla):
+            GroupMembership.objects.create(group=self.group, user=user, is_accepted=True)
+
+    def add_obligation(self, payer, debtor, amount, group=None, paid=False):
+        group = group or self.group
+        expense = Expense.objects.create(group=group, paid_by=payer, created_by=payer, title='Despesa', amount=Decimal(amount), date=date(2026, 1, 1))
+        return ExpenseSplit.objects.create(expense=expense, user=debtor, amount_owed=Decimal(amount), is_paid=paid)
+
+    def balances(self):
+        from .services import calculate_participant_balances
+        return {row['participant'].pk: row for row in calculate_participant_balances(self.group, self.me)}
+
+    def test_unilaterais_reciprocos_e_saldo_zero(self):
+        self.add_obligation(self.alice, self.me, '250.00')
+        self.add_obligation(self.me, self.alice, '100.00')
+        self.add_obligation(self.me, self.bob, '200.00')
+        self.add_obligation(self.bob, self.me, '50.00')
+        self.add_obligation(self.carla, self.me, '100.00')
+        self.add_obligation(self.me, self.carla, '100.00')
+        with self.assertNumQueries(1):
+            balances = self.balances()
+        for user, owed, receivable, net, direction in (
+            (self.alice, '250.00', '100.00', '150.00', 'DEVE'),
+            (self.bob, '50.00', '200.00', '150.00', 'RECEBE'),
+            (self.carla, '100.00', '100.00', '0.00', 'EM_DIA'),
+        ):
+            with self.subTest(user=user):
+                row = balances[user.pk]
+                self.assertEqual((row['amount_owed'], row['amount_receivable'], row['net_amount'], row['direction']),
+                                 (Decimal(owed), Decimal(receivable), Decimal(net), direction))
+
+    def test_pagas_cota_propria_outros_grupos_e_terceiros_sao_ignorados(self):
+        other_group = Group.objects.create(name='Outro', created_by=self.me)
+        GroupMembership.objects.create(group=other_group, user=self.alice, is_accepted=True)
+        self.add_obligation(self.alice, self.me, '99.00', group=other_group)
+        self.add_obligation(self.alice, self.me, '10.00', paid=True)
+        self.add_obligation(self.me, self.me, '20.00')
+        self.add_obligation(self.alice, self.bob, '30.00')
+        self.assertEqual(self.balances(), {})
+
+    def test_todas_despesas_e_vinculo_removido(self):
+        for _ in range(8):
+            self.add_obligation(self.me, self.alice, '1.25')
+        GroupMembership.objects.filter(group=self.group, user=self.alice).delete()
+        balance = self.balances()[self.alice.pk]
+        self.assertEqual(balance['amount_receivable'], Decimal('10.00'))
+        self.assertEqual(balance['direction'], 'RECEBE')
+
+    def test_recalcula_ao_criar_editar_excluir_e_alternar_pagamento(self):
+        split = self.add_obligation(self.alice, self.me, '10.00')
+        self.assertEqual(self.balances()[self.alice.pk]['net_amount'], Decimal('10.00'))
+        second = self.add_obligation(self.me, self.alice, '4.00')
+        self.assertEqual(self.balances()[self.alice.pk]['net_amount'], Decimal('6.00'))
+        second.amount_owed = Decimal('7.00')
+        second.save()
+        self.assertEqual(self.balances()[self.alice.pk]['net_amount'], Decimal('3.00'))
+        split.is_paid = True
+        split.save()
+        self.assertEqual(self.balances()[self.alice.pk]['direction'], 'RECEBE')
+        split.is_paid = False
+        split.save()
+        self.assertEqual(self.balances()[self.alice.pk]['direction'], 'DEVE')
+        split.expense.delete()
+        self.assertEqual(self.balances()[self.alice.pk]['net_amount'], Decimal('7.00'))
+
+    def test_balanco_na_pagina_das_duas_perspectivas_e_atualizacao(self):
+        from django.utils.html import strip_tags
+        first = self.add_obligation(self.alice, self.me, '1666.00')
+        self.add_obligation(self.me, self.alice, '300.00')
+        self.add_obligation(self.bob, self.carla, '55.00')
+        self.client.force_login(self.me)
+        response = self.client.get(reverse('group_detail', args=[self.group.pk]))
+        self.assertEqual(len(response.context['participant_balances']), 1)
+        text = ' '.join(strip_tags(response.content.decode()).split())
+        self.assertIn('Você deve R$ 1.366,00 a balance_alice', text)
+        self.client.force_login(self.alice)
+        response = self.client.get(reverse('group_detail', args=[self.group.pk]))
+        text = ' '.join(strip_tags(response.content.decode()).split())
+        self.assertIn('balance_me te deve R$ 1.366,00', text)
+        first.is_paid = True
+        first.save()
+        response = self.client.get(reverse('group_detail', args=[self.group.pk]))
+        self.assertEqual(response.context['participant_balances'][0]['direction'], 'DEVE')
+        self.assertEqual(response.context['participant_balances'][0]['net_amount'], Decimal('300.00'))
+
+    def test_balanco_zero_e_vazio_na_pagina(self):
+        self.client.force_login(self.me)
+        url = reverse('group_detail', args=[self.group.pk])
+        self.assertContains(self.client.get(url), 'Você não possui pendências neste grupo.')
+        self.add_obligation(self.alice, self.me, '10.00')
+        self.add_obligation(self.me, self.alice, '10.00')
+        response = self.client.get(url)
+        self.assertContains(response, 'estão em dia')
+        self.assertEqual(response.context['participant_balances'][0]['direction'], 'EM_DIA')
+
+    def test_card_do_grupo_e_link_unico(self):
+        from django.utils.html import escape
+        self.client.force_login(self.me)
+        response = self.client.get(reverse('group_list'))
+        url = reverse('group_detail', args=[self.group.pk])
+        self.assertContains(response, f'href="{url}" class="se-groups-panel se-group-card"', html=False)
+        self.assertContains(response, f'href="{url}"', count=1)
+        self.assertContains(response, escape(self.group.name))
+        self.assertContains(response, 'Acessar grupo')
