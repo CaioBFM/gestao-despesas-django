@@ -1,8 +1,10 @@
 from decimal import Decimal, InvalidOperation
 from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
+from django.db.models import F, Q
 from .models import Group, GroupMembership, Expense, ExpenseSplit
 from .forms import GroupForm, JoinGroupForm, ExpenseForm, parse_splits_from_post
 
@@ -19,18 +21,49 @@ def _is_group_admin_or_superuser(user, group, membership=None):
     return bool(membership and membership.is_group_admin)
 
 
+def _is_last_group_admin(membership):
+    return (
+        membership.is_accepted
+        and membership.is_group_admin
+        and not GroupMembership.objects.filter(
+            group=membership.group, is_accepted=True, is_group_admin=True,
+        ).exclude(pk=membership.pk).exists()
+    )
+
+
+def _has_pending_obligations(group, user=None):
+    splits = ExpenseSplit.objects.filter(expense__group=group, is_paid=False).exclude(
+        user_id=F('expense__paid_by_id')
+    )
+    if user is not None:
+        splits = splits.filter(Q(user=user) | Q(expense__paid_by=user))
+    return splits.exists()
+
+
 def _can_manage_expense(user, expense, group, membership=None):
     if user.is_superuser:
         return True
+    if membership is None:
+        membership = _get_accepted_membership(user, group)
+    if not membership or not membership.is_accepted:
+        return False
     if expense.created_by_id == user.pk or expense.paid_by_id == user.pk:
         return True
     return _is_group_admin_or_superuser(user, group, membership)
+
+
+def _can_toggle_split(user, split, membership):
+    return _can_manage_expense(user, split.expense, split.expense.group, membership) or bool(
+        membership and membership.is_accepted and split.user_id == user.pk
+    )
 
 
 def _user_participation_status(user, expense):
     split = next((s for s in expense.splits.all() if s.user_id == user.pk), None)
     if split is None:
         return 'Não participa', None
+    if expense.paid_by_id == user.pk:
+        return 'Cota própria', split
     if split.is_paid:
         return 'Paga', split
     return 'A pagar', split
@@ -123,7 +156,7 @@ def group_detail(request, pk):
         messages.error(request, 'Você não tem permissão para acessar este grupo.')
         return redirect('group_list')
 
-    user_is_group_admin = _is_group_admin_or_superuser(request.user, group, membership)
+    user_is_group_admin = bool(membership and membership.is_accepted and membership.is_group_admin)
 
     if request.method == 'POST' and user_is_group_admin:
         action = request.POST.get('action')
@@ -140,6 +173,8 @@ def group_detail(request, pk):
             return redirect('group_detail', pk=group.pk)
 
     members = GroupMembership.objects.filter(group=group).select_related('user')
+    is_only_member = bool(membership and not members.exclude(pk=membership.pk).exists())
+    leave_blocked = bool(membership and not is_only_member and _is_last_group_admin(membership))
 
     expenses_qs = (
         group.expenses
@@ -153,8 +188,9 @@ def group_detail(request, pk):
 
     for exp in expenses_qs:
         status_label, user_split = _user_participation_status(request.user, exp)
-        paid_splits_count = sum(1 for s in exp.splits.all() if s.is_paid)
-        total_splits_count = len(exp.splits.all())
+        obligations = [s for s in exp.splits.all() if s.user_id != exp.paid_by_id]
+        paid_splits_count = sum(1 for s in obligations if s.is_paid)
+        total_splits_count = len(obligations)
         can_manage = _can_manage_expense(request.user, exp, group, membership)
 
         total_group_amount += exp.amount
@@ -174,6 +210,8 @@ def group_detail(request, pk):
         'group': group,
         'members': members,
         'is_admin': user_is_group_admin,
+        'is_only_member': is_only_member,
+        'leave_blocked': leave_blocked,
         'expense_items': expense_items,
         'total_group_amount': total_group_amount,
         'total_to_pay_by_user': total_to_pay_by_user,
@@ -181,11 +219,12 @@ def group_detail(request, pk):
 
 
 @login_required
+@require_POST
 def member_action(request, group_id, membership_id):
     group = get_object_or_404(Group, pk=group_id)
     user_membership = _get_accepted_membership(request.user, group)
 
-    if not _is_group_admin_or_superuser(request.user, group, user_membership):
+    if not (user_membership and user_membership.is_accepted and user_membership.is_group_admin):
         messages.error(request, 'Ação restrita aos administradores do grupo.')
         return redirect('group_detail', pk=group.pk)
 
@@ -201,15 +240,17 @@ def member_action(request, group_id, membership_id):
         target_membership.save()
         messages.success(request, f'Membro {target_membership.user.username} promovido a administrador.')
     elif action == 'demote':
-        if target_membership.user == group.created_by:
-            messages.error(request, 'O criador do grupo não pode deixar de ser administrador.')
+        if _is_last_group_admin(target_membership):
+            messages.error(request, 'O último administrador não pode perder o cargo.')
         else:
             target_membership.is_group_admin = False
             target_membership.save()
             messages.success(request, f'Membro {target_membership.user.username} rebaixado a usuário comum.')
     elif action == 'kick':
-        if target_membership.user == group.created_by:
-            messages.error(request, 'O criador do grupo não pode ser removido.')
+        if _is_last_group_admin(target_membership):
+            messages.error(request, 'O último administrador não pode ser removido.')
+        elif _has_pending_obligations(group, target_membership.user):
+            messages.warning(request, 'Há pendências financeiras que precisam ser quitadas antes da remoção do membro.')
         else:
             target_membership.delete()
             messages.success(request, 'Membro removido do grupo.')
@@ -218,12 +259,29 @@ def member_action(request, group_id, membership_id):
 
 
 @login_required
+@require_POST
+@transaction.atomic
 def group_leave(request, pk):
-    group = get_object_or_404(Group, pk=pk)
+    group = get_object_or_404(Group.objects.select_for_update(), pk=pk)
     membership = get_object_or_404(GroupMembership, user=request.user, group=group)
 
-    if request.user == group.created_by:
-        messages.error(request, 'O criador não pode sair do próprio grupo.')
+    if not GroupMembership.objects.filter(group=group).exclude(pk=membership.pk).exists():
+        if _has_pending_obligations(group):
+            messages.warning(request, 'Há pendências financeiras que precisam ser quitadas antes da saída e exclusão do grupo.')
+            return redirect('group_detail', pk=group.pk)
+        if request.POST.get('confirm_delete') != 'yes':
+            messages.warning(request, 'Confirme a exclusão permanente do grupo e de todas as despesas para sair.')
+            return redirect('group_detail', pk=group.pk)
+        group.delete()
+        messages.success(request, 'Você saiu do grupo. O grupo e todos os dados associados foram excluídos permanentemente.')
+        return redirect('group_list')
+
+    if _is_last_group_admin(membership):
+        messages.warning(request, 'Você é o último administrador deste grupo. Promova outro participante a administrador antes de sair.')
+        return redirect('group_detail', pk=group.pk)
+    elif _has_pending_obligations(group, request.user):
+        messages.warning(request, 'Há pendências financeiras que precisam ser quitadas antes da saída do grupo.')
+        return redirect('group_detail', pk=group.pk)
     else:
         membership.delete()
         messages.success(request, 'Você saiu do grupo com sucesso.')
@@ -303,9 +361,8 @@ def expense_create(request, group_id):
     participant_rows = []
     for m in accepted_memberships:
         uid = m.user_id
-        is_checked = (uid in splits_data) if request.method == 'POST' else True
-        amount_val = splits_data.get(uid)
-        amount_str = f'{amount_val:.2f}' if amount_val is not None else ''
+        is_checked = request.POST.get(f'split_participates_{uid}') == 'on' if request.method == 'POST' else True
+        amount_str = request.POST.get(f'split_amount_{uid}', '') if request.method == 'POST' else ''
         participant_rows.append({
             'user': m.user,
             'checked': is_checked,
@@ -316,6 +373,7 @@ def expense_create(request, group_id):
         'form': form,
         'group': group,
         'participant_rows': participant_rows,
+        'split_mode': request.POST.get('split_mode', 'value'),
         'is_edit': False,
     })
 
@@ -338,15 +396,17 @@ def expense_detail(request, pk):
 
     splits_with_perms = []
     for s in expense.splits.all():
-        can_toggle = can_manage or (s.user_id == request.user.pk)
+        can_toggle = _can_toggle_split(request.user, s, membership)
         splits_with_perms.append({
             'split': s,
             'can_toggle': can_toggle,
         })
 
     total_splits = sum((s.amount_owed for s in expense.splits.all()), Decimal('0.00'))
-    paid_total = sum((s.amount_owed for s in expense.splits.all() if s.is_paid), Decimal('0.00'))
-    remaining_total = total_splits - paid_total
+    paid_total = sum((s.amount_owed for s in expense.splits.all()
+                      if s.is_paid and s.user_id != expense.paid_by_id), Decimal('0.00'))
+    remaining_total = sum((s.amount_owed for s in expense.splits.all()
+                           if not s.is_paid and s.user_id != expense.paid_by_id), Decimal('0.00'))
 
     return render(request, 'expenses/expense_detail.html', {
         'expense': expense,
@@ -426,13 +486,13 @@ def expense_update(request, pk):
     for m in accepted_memberships:
         uid = m.user_id
         if request.method == 'POST':
-            is_checked = uid in splits_data
-            amount_val = splits_data.get(uid)
+            is_checked = request.POST.get(f'split_participates_{uid}') == 'on'
+            amount_str = request.POST.get(f'split_amount_{uid}', '')
         else:
             is_checked = uid in existing_splits_map
             amount_val = existing_splits_map[uid].amount_owed if uid in existing_splits_map else None
+            amount_str = f'{amount_val:.2f}' if amount_val is not None else ''
 
-        amount_str = f'{amount_val:.2f}' if amount_val is not None else ''
         participant_rows.append({
             'user': m.user,
             'checked': is_checked,
@@ -444,6 +504,7 @@ def expense_update(request, pk):
         'group': group,
         'expense': expense,
         'participant_rows': participant_rows,
+        'split_mode': request.POST.get('split_mode', 'value'),
         'is_edit': True,
     })
 
@@ -483,10 +544,7 @@ def split_toggle_paid(request, split_id):
     group = expense.group
     membership = _get_accepted_membership(request.user, group)
 
-    can_manage = _can_manage_expense(request.user, expense, group, membership)
-    is_debtor = (split.user_id == request.user.pk)
-
-    if not (can_manage or is_debtor):
+    if not _can_toggle_split(request.user, split, membership):
         messages.error(request, 'Você não tem permissão para alterar o pagamento desta divisão.')
         return redirect('expense_detail', pk=expense.pk)
 

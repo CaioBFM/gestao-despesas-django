@@ -65,6 +65,8 @@
                     <span class="badge bg-success fs-6 mt-1">Paga (R$ {{ user_split.amount_owed|floatformat:2 }})</span>
                 {% elif user_status == 'A pagar' %}
                     <span class="badge bg-warning text-dark fs-6 mt-1">A pagar (R$ {{ user_split.amount_owed|floatformat:2 }})</span>
+                {% elif user_status == 'Cota própria' %}
+                    <span class="badge bg-info text-dark fs-6 mt-1">Cota própria (R$ {{ user_split.amount_owed|floatformat:2 }})</span>
                 {% else %}
                     <span class="badge bg-secondary fs-6 mt-1">Não participa</span>
                 {% endif %}
@@ -91,7 +93,9 @@
                     <td>{{ row.split.user.username }}</td>
                     <td><strong>R$ {{ row.split.amount_owed|floatformat:2 }}</strong></td>
                     <td>
-                        {% if row.split.is_paid %}
+                        {% if row.split.user_id == expense.paid_by_id %}
+                            <span class="badge bg-info text-dark">Cota própria</span>
+                        {% elif row.split.is_paid %}
                             <span class="badge bg-success">Paga</span>
                         {% else %}
                             <span class="badge bg-warning text-dark">A pagar</span>

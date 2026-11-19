@@ -54,13 +54,12 @@ class ExpenseForm(forms.ModelForm):
 
 
 def parse_splits_from_post(post_data, accepted_memberships, total_amount=None):
-    """
-    Lê os checkboxes `split_participates_<user_id>` e campos `split_amount_<user_id>`.
-    Se `total_amount` for informado (Decimal), valida se a soma das divisões não ultrapassa o valor total.
-    Retorna `(splits_dict, errors_list)` onde `splits_dict` mapeia `user_id -> Decimal(amount_owed)`.
-    """
     splits = {}
     errors = []
+    mode = post_data.get('split_mode', 'value')
+    if mode not in ('value', 'percentage'):
+        return {}, ['Modo de divisão inválido.']
+    selected = 0
 
     for membership in accepted_memberships:
         uid = membership.user_id
@@ -68,6 +67,7 @@ def parse_splits_from_post(post_data, accepted_memberships, total_amount=None):
         raw_amount = (post_data.get(f'split_amount_{uid}') or '').strip().replace(',', '.')
 
         if participates:
+            selected += 1
             if not raw_amount:
                 errors.append(f'Informe o valor devido para {membership.user.username}.')
                 continue
@@ -76,18 +76,27 @@ def parse_splits_from_post(post_data, accepted_memberships, total_amount=None):
             except InvalidOperation:
                 errors.append(f'Valor inválido para {membership.user.username}.')
                 continue
-            if val < Decimal('0.01'):
-                errors.append(f'O valor de {membership.user.username} deve ser de pelo menos R$ 0,01.')
+            if not val.is_finite() or val < Decimal('0.01') or val > Decimal('1000000000000') or val.as_tuple().exponent < -2:
+                errors.append(f'Informe um valor positivo válido com até duas casas decimais para {membership.user.username}.')
                 continue
-            splits[uid] = val.quantize(Decimal('0.01'))
+            splits[uid] = val
 
-    if not splits:
+    if not selected:
         errors.append('Selecione pelo menos um participante aceito no grupo para dividir a despesa.')
-    elif total_amount is not None:
-        splits_sum = sum(splits.values(), Decimal('0.00'))
-        if splits_sum > total_amount:
-            errors.append(
-                f'A soma das divisões (R$ {splits_sum:.2f}) não pode ser maior que o valor total da despesa (R$ {total_amount:.2f}).'
-            )
+    if errors or total_amount is None or not total_amount.is_finite() or total_amount <= 0:
+        return splits, errors
+
+    target = Decimal('100') if mode == 'percentage' else total_amount
+    if sum(splits.values(), Decimal('0')) != target:
+        errors.append('A soma dos percentuais deve ser exatamente 100%.' if mode == 'percentage'
+                      else 'A soma das divisões deve ser exatamente igual ao valor total da despesa.')
+    elif mode == 'percentage':
+        total_cents = int(total_amount * 100)
+        shares = {uid: divmod(total_cents * int(value * 100), 10000) for uid, value in splits.items()}
+        remaining = total_cents - sum(share[0] for share in shares.values())
+        winners = sorted(shares, key=lambda uid: (-shares[uid][1], uid))[:remaining]
+        splits = {uid: Decimal(cents + (uid in winners)) / 100 for uid, (cents, _) in shares.items()}
+        if any(value < Decimal('0.01') for value in splits.values()):
+            errors.append('Cada participante deve receber pelo menos R$ 0,01.')
 
     return splits, errors

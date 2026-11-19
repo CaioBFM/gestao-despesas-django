@@ -30,6 +30,8 @@
                             <span class="badge bg-success">Paga (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>
                         {% elif item.user_status == 'A pagar' %}
                             <span class="badge bg-warning text-dark">A pagar (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>
+                        {% elif item.user_status == 'Cota própria' %}
+                            <span class="badge bg-info text-dark">Cota própria (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>
                         {% else %}
                             <span class="badge bg-secondary">Não participa</span>
                         {% endif %}
