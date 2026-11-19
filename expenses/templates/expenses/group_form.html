@@ -4,6 +4,9 @@
 {% block pagina_titulo %}Grupos{% endblock %}
 {% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}">{% endblock %}
 {% block conteudo %}
+<a href="{% url 'group_list' %}" class="se-detail-back">
+    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Voltar aos grupos
+</a>
 <header class="se-groups-heading"><div><h1>Criar grupo</h1><p>Crie um espaço para organizar despesas.</p></div></header>
 {% include 'expenses/group_messages.html' %}
 <section class="se-groups-panel se-group-form-panel">
