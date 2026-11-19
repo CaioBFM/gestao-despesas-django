@@ -62,9 +62,13 @@
 .se-user-avatar {
     width: 35px; height: 35px; border-radius: 50%; display: grid; place-items: center;
     background: var(--se-primary-soft); color: var(--se-primary); font-size: 11px;
-    font-weight: 700; flex: none;
+    font-weight: 700; flex: none; text-decoration: none;
 }
-.se-user-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.se-profile-link { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 4px; border-radius: 9px; color: var(--se-text); text-decoration: none; }
+.se-profile-link:hover { background: var(--se-surface-2); }
+.se-profile-link[aria-current="page"] { color: var(--se-primary); background: var(--se-primary-soft); }
+.se-profile-label { color: var(--se-muted); font-size: 12px; white-space: nowrap; }
+.se-profile-link[aria-current="page"] .se-profile-label, .se-profile-link:hover .se-profile-label { color: var(--se-primary); }
 .se-admin-link { color: var(--se-muted); font-size: 12px; text-decoration: none; margin-left: 12px; }
 .se-admin-link:hover { color: var(--se-primary); }
 .se-logout-form { margin: 0 0 0 8px; }
@@ -95,7 +99,6 @@
     .se-topbar { height: 62px; padding: 0 18px; }
     .se-topbar-title { display: none; }
     .se-mobile-menu { display: inline-flex; align-items: center; justify-content: center; width: 35px; height: 35px; color: var(--se-text); border: 0; background: transparent; font-size: 17px; }
-    .se-user-name { max-width: 110px; }
     .se-logout-form button span { display: none; }
     .se-admin-link { display: none; }
     .se-page-content { padding: 28px 18px 48px; }
@@ -116,5 +119,4 @@
 }
 @media (max-width: 420px) {
     .se-user-toolbar { gap: 7px; }
-    .se-user-name { max-width: 90px; }
 }

@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from .forms import CadastroForm, UserProfileForm
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -76,6 +77,7 @@ def perfil_usuario(request):
         form = UserProfileForm(request.POST, instance=request.user)
         if form.is_valid():
             form.save()
+            messages.success(request, 'Perfil atualizado com sucesso.')
             return redirect('perfil')
     else:
         form = UserProfileForm(instance=request.user)

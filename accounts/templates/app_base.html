@@ -24,6 +24,7 @@
 </head>
 
 <body class="se-app-body">
+    {% with current=request.resolver_match.url_name %}
     <div class="se-app">
         <aside class="se-sidebar" id="se-sidebar" aria-label="Navegação principal">
             <div class="se-sidebar-header">
@@ -44,13 +45,14 @@
             </div>
 
             <nav class="se-side-nav" aria-label="Seções do aplicativo">
-                <a href="{% url 'inicio' %}" class="se-side-link se-side-link-active" aria-current="page">
-                    <i class="fa-solid fa-house" aria-hidden="true"></i><span>Início</span>
+                <a href="{% url 'inicio' %}" class="se-side-link{% if request.resolver_match.url_name == 'inicio' %} se-side-link-active{% endif %}">                    <i class="fa-solid fa-house" aria-hidden="true"></i><span>Início</span>
                 </a>
-                <span class="se-side-link se-side-link-disabled" aria-disabled="true"
-                    title="Disponível após integração do CRUD">
+                <a href="{% url 'group_list' %}" class="se-side-link{% if current == 'group_list' or current == 'group_detail' or current == 'group_create' %} se-side-link-active{% endif %}"{% if current == 'group_list' or current == 'group_detail' or current == 'group_create' %} aria-current="page"{% endif %}>
                     <i class="fa-solid fa-users" aria-hidden="true"></i><span>Grupos</span>
-                </span>
+                </a>
+                <a href="{% url 'expense_list_all' %}" class="se-side-link{% if current == 'expense_list_all' or current == 'expense_detail' or current == 'expense_create' or current == 'expense_update' or current == 'expense_delete' %} se-side-link-active{% endif %}"{% if current == 'expense_list_all' or current == 'expense_detail' or current == 'expense_create' or current == 'expense_update' or current == 'expense_delete' %} aria-current="page"{% endif %}>
+                    <i class="fa-solid fa-receipt" aria-hidden="true"></i><span>Despesas</span>
+                </a>
                 <span class="se-side-link se-side-link-disabled" aria-disabled="true" title="Em desenvolvimento">
                     <i class="fa-solid fa-user-group" aria-hidden="true"></i><span>Amigos</span>
                 </span>
@@ -89,8 +91,10 @@
                     <span class="se-topbar-title">{% block pagina_titulo %}Início{% endblock %}</span>
                 </div>
                 <div class="se-user-toolbar">
-                    <span class="se-user-avatar" aria-hidden="true">{{ request.user.username|slice:':2'|upper }}</span>
-                    <span class="se-user-name">{{ request.user.get_full_name|default:request.user.username }}</span>
+                    <a href="{% url 'perfil' %}" class="se-profile-link"{% if current == 'perfil' %} aria-current="page"{% endif %}>
+                        <span class="se-user-avatar" aria-hidden="true">{{ request.user.username|slice:':2'|upper }}</span>
+                        <span class="se-profile-label">Meu perfil</span>
+                    </a>
                     {% if request.user.is_staff %}
                     <a class="se-admin-link" href="{% url 'admin:index' %}" title="Acessar administração">Admin</a>
                     {% endif %}
@@ -109,12 +113,12 @@
         </div>
 
         <nav class="se-mobile-bottom-nav" aria-label="Navegação rápida">
-            <a class="se-bottom-active" href="{% url 'inicio' %}" aria-current="page"><i class="fa-solid fa-house"
+            <a{% if current == 'inicio' %} class="se-bottom-active" aria-current="page"{% endif %} href="{% url 'inicio' %}"><i class="fa-solid fa-house"
                     aria-hidden="true"></i><span>Início</span></a>
-            <span class="se-bottom-disabled" aria-disabled="true"><i class="fa-solid fa-users"
-                    aria-hidden="true"></i><span>Grupos</span></span>
-            <span class="se-bottom-disabled" aria-disabled="true"><i class="fa-solid fa-clock-rotate-left"
-                    aria-hidden="true"></i><span>Histórico</span></span>
+            <a{% if current == 'group_list' or current == 'group_detail' or current == 'group_create' %} class="se-bottom-active" aria-current="page"{% endif %} href="{% url 'group_list' %}"><i class="fa-solid fa-users"
+                    aria-hidden="true"></i><span>Grupos</span></a>
+            <a{% if current == 'expense_list_all' or current == 'expense_detail' or current == 'expense_create' or current == 'expense_update' or current == 'expense_delete' %} class="se-bottom-active" aria-current="page"{% endif %} href="{% url 'expense_list_all' %}"><i class="fa-solid fa-receipt"
+                    aria-hidden="true"></i><span>Despesas</span></a>
             <button id="se-mobile-more" type="button" aria-controls="se-sidebar" aria-expanded="false"><i
                     class="fa-solid fa-bars" aria-hidden="true"></i><span>Mais</span></button>
         </nav>
@@ -155,6 +159,7 @@
             syncTheme();
         })();
     </script>
+    {% endwith %}
 </body>
 
 </html>

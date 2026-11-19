@@ -27,6 +27,7 @@
 .se-groups-empty i { margin-bottom: 13px; color: var(--se-primary); font-size: 25px; }
 .se-groups-empty p { margin: 0; }
 .se-group-form-panel { max-width: 620px; padding: 24px; }
+.se-profile-title { margin: 0 0 20px; font-size: 15px; font-weight: 700; }
 .se-group-field { margin-bottom: 20px; }
 .se-group-field label { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 600; }
 .se-group-field textarea { min-height: 110px; }

@@ -281,7 +281,10 @@
 }
 
 [data-bs-theme="dark"] .se-brand-symbol {
-  color: #b8d0e6;
+  color: #FFFFFF;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, .25);
+  box-shadow: none;
 }
 
 [data-bs-theme="dark"] .se-brand-name {
