@@ -37,17 +37,33 @@ def group_join(request):
             code = form.cleaned_data['invite_code'].upper().strip()
             try:
                 group = Group.objects.get(invite_code=code, is_active=True)
-                # Cria o vínculo como pendente (is_accepted=False)
-                membership, created = GroupMembership.objects.get_or_create(
+                existing_membership = GroupMembership.objects.filter(
                     user=request.user,
-                    group=group,
-                    defaults={'is_accepted': False, 'is_group_admin': False}
-                )
-                if created:
-                    messages.success(request, 'Solicitação de entrada enviada ao administrador do grupo!')
+                    group=group
+                ).first()
+
+                if existing_membership:
+                    if existing_membership.is_accepted:
+                        messages.info(request, f'Você já faz parte do grupo "{group.name}".')
+                        return redirect('group_detail', pk=group.pk)
+                    else:
+                        messages.info(
+                            request,
+                            f'Seu pedido para entrar no grupo "{group.name}" (código {group.invite_code}) já foi enviado e aguarda aprovação.'
+                        )
                 else:
-                    messages.info(request, 'Você já possui um vínculo ou solicitação pendente para este grupo.')
-                return redirect('group_detail', pk=group.pk)
+                    GroupMembership.objects.create(
+                        user=request.user,
+                        group=group,
+                        is_accepted=False,
+                        is_group_admin=False
+                    )
+                    messages.success(
+                        request,
+                        f'Pedido de entrada enviado para o grupo "{group.name}" (código {group.invite_code})! Aguarde a aprovação de um administrador.'
+                    )
+
+                return redirect('group_list')
             except Group.DoesNotExist:
                 messages.error(request, 'Código de convite inválido ou grupo desativado.')
     return redirect('group_list')
@@ -56,14 +72,17 @@ def group_join(request):
 def group_detail(request, pk):
     group = get_object_or_404(Group, pk=pk, is_active=True)
     
-    # Garante que o usuário logado faz parte do grupo (aceito) ou é superuser
+    # Verifica se o usuário é membro aceito ou superuser
     membership = GroupMembership.objects.filter(user=request.user, group=group, is_accepted=True).first()
     if not membership and not request.user.is_superuser:
         messages.error(request, 'Você não tem permissão para acessar este grupo.')
         return redirect('group_list')
 
-    # Trata alteração da descrição ou do código de convite pelo Admin do Grupo (com blindagem para superuser sem membership)
-    if request.method == 'POST' and ((membership and membership.is_group_admin) or request.user.is_superuser):
+    # Define se o usuário é admin: se for superuser do sistema OU admin do grupo
+    user_is_group_admin = True if request.user.is_superuser else (membership.is_group_admin if membership else False)
+
+    # Trata alteração da descrição ou do código de convite
+    if request.method == 'POST' and user_is_group_admin:
         action = request.POST.get('action')
         if action == 'update_info':
             group.description = request.POST.get('description', group.description)
@@ -81,7 +100,7 @@ def group_detail(request, pk):
     return render(request, 'expenses/group_detail.html', {
         'group': group,
         'members': members,
-        'is_admin': membership.is_group_admin if membership else True
+        'is_admin': user_is_group_admin
     })
 
 @login_required
@@ -89,9 +108,9 @@ def member_action(request, group_id, membership_id):
     group = get_object_or_404(Group, pk=group_id)
     user_membership = GroupMembership.objects.filter(user=request.user, group=group, is_accepted=True).first()
     
-    # Valida se quem está requisitando é admin do grupo ou superuser
-    is_group_admin = user_membership.is_group_admin if user_membership else False
-    if not is_group_admin and not request.user.is_superuser:
+    # Valida se quem está requisitando é admin do grupo ou superuser do sistema
+    user_is_group_admin = True if request.user.is_superuser else (user_membership.is_group_admin if user_membership else False)
+    if not user_is_group_admin:
         messages.error(request, 'Ação restrita aos administradores do grupo.')
         return redirect('group_detail', pk=group.pk)
 
@@ -106,6 +125,14 @@ def member_action(request, group_id, membership_id):
         target_membership.is_group_admin = True
         target_membership.save()
         messages.success(request, f'Membro {target_membership.user.username} promovido a administrador.')
+    elif action == 'demote':
+        # Impede rebaixar o criador do grupo
+        if target_membership.user == group.created_by:
+            messages.error(request, 'O criador do grupo não pode deixar de ser administrador.')
+        else:
+            target_membership.is_group_admin = False
+            target_membership.save()
+            messages.success(request, f'Membro {target_membership.user.username} rebaixado a usuário comum.')
     elif action == 'kick':
         if target_membership.user == group.created_by:
             messages.error(request, 'O criador do grupo não pode ser removido.')
