@@ -1,0 +1,121 @@
+{% extends 'app_base.html' %}
+{% load static %}
+{% block titulo %}Histórico pessoal - SplitExpenses{% endblock %}
+{% block pagina_titulo %}Histórico{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}"><link rel="stylesheet" href="{% static 'css/expenses.css' %}">{% endblock %}
+{% block conteudo %}
+<a href="{% url 'inicio' %}" class="se-detail-back">
+    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Voltar ao início
+</a>
+
+<header class="se-groups-heading">
+    <div>
+        <h1>Histórico pessoal</h1>
+        <p>Acompanhe todas as suas parcelas já pagas e o que você ainda deve.</p>
+    </div>
+</header>
+
+{% include 'expenses/group_messages.html' %}
+
+<div class="se-detail-summary">
+    <article class="se-groups-panel se-detail-balance se-detail-due">
+        <span class="se-detail-icon" aria-hidden="true"><i class="fa-solid fa-clock"></i></span>
+        <div>
+            <p>Ainda devo (pendente)</p>
+            <strong>R$ {{ total_to_pay|floatformat:2 }}</strong>
+        </div>
+    </article>
+    <article class="se-groups-panel se-detail-balance se-expense-paid">
+        <span class="se-detail-icon" aria-hidden="true"><i class="fa-solid fa-circle-check"></i></span>
+        <div>
+            <p>Cotas quitadas</p>
+            <strong>R$ {{ total_paid_by_me|floatformat:2 }}</strong>
+        </div>
+    </article>
+    <article class="se-groups-panel se-detail-balance se-expense-paid">
+        <span class="se-detail-icon" aria-hidden="true"><i class="fa-solid fa-money-bill-transfer"></i></span>
+        <div>
+            <p>Despesas pagas por mim</p>
+            <strong>R$ {{ total_expenses_paid_by_me|floatformat:2 }}</strong>
+        </div>
+    </article>
+</div>
+
+<section class="se-groups-panel se-detail-panel" aria-labelledby="paid-by-me-title">
+    <div class="se-detail-panel-heading">
+        <h2 id="paid-by-me-title">Despesas que paguei</h2>
+    </div>
+    <div class="se-detail-table-wrap">
+        <table class="se-detail-table">
+            <thead>
+                <tr><th>Despesa</th><th>Grupo</th><th>Data</th><th>Valor pago</th><th>Ação</th></tr>
+            </thead>
+            <tbody>
+                {% for expense in expenses_paid_by_me %}
+                <tr>
+                    <td><strong>{{ expense.title }}</strong></td>
+                    <td><a class="se-expense-link" href="{% url 'group_detail' expense.group.pk %}">{{ expense.group.name }}</a></td>
+                    <td>{{ expense.date|date:'d/m/Y' }}</td>
+                    <td><strong>R$ {{ expense.amount|floatformat:2 }}</strong></td>
+                    <td><a href="{% url 'expense_detail' expense.pk %}" class="se-detail-action">Ver despesa</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="se-detail-empty">Você ainda não registrou despesas pagas por você.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="se-groups-panel se-detail-panel" aria-labelledby="history-title">
+    <div class="se-detail-panel-heading">
+        <h2 id="history-title">Minhas cotas nas despesas</h2>
+        <div class="se-detail-actions">
+            <a href="{% url 'personal_history' %}" class="se-detail-action{% if status_filter == 'all' %} se-groups-button-primary{% endif %}">Todas</a>
+            <a href="{% url 'personal_history' %}?status=pending" class="se-detail-action{% if status_filter == 'pending' %} se-groups-button-primary{% endif %}">A pagar</a>
+            <a href="{% url 'personal_history' %}?status=paid" class="se-detail-action{% if status_filter == 'paid' %} se-groups-button-primary{% endif %}">Pagas</a>
+        </div>
+    </div>
+
+    <div class="se-detail-table-wrap">
+        <table class="se-detail-table">
+            <thead>
+                <tr>
+                    <th>Despesa</th>
+                    <th>Grupo</th>
+                    <th>Data</th>
+                    <th>Pago por</th>
+                    <th>Sua cota</th>
+                    <th>Status</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for split in splits %}
+                <tr>
+                    <td><strong>{{ split.expense.title }}</strong></td>
+                    <td><a class="se-expense-link" href="{% url 'group_detail' split.expense.group.pk %}">{{ split.expense.group.name }}</a></td>
+                    <td>{{ split.expense.date|date:'d/m/Y' }}</td>
+                    <td>{{ split.expense.paid_by.username }}</td>
+                    <td><strong>R$ {{ split.amount_owed|floatformat:2 }}</strong></td>
+                    <td>
+                        {% if split.is_paid %}
+                            <span class="se-detail-badge se-detail-success">Paga</span>
+                        {% else %}
+                            <span class="se-detail-badge se-detail-warning">A pagar</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'expense_detail' split.expense.pk %}" class="se-detail-action">Ver despesa</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="se-detail-empty">Nenhuma despesa encontrada neste filtro.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

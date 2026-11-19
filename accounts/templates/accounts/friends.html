@@ -1,0 +1,133 @@
+{% extends 'app_base.html' %}
+{% load static %}
+{% block titulo %}Amigos - SplitExpenses{% endblock %}
+{% block pagina_titulo %}Amigos{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}">{% endblock %}
+{% block conteudo %}
+<a href="{% url 'inicio' %}" class="se-detail-back">
+    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Voltar ao início
+</a>
+<header class="se-groups-heading">
+    <div>
+        <h1>Amigos</h1>
+        <p>Adicione pessoas pelo username e gerencie suas solicitações de amizade.</p>
+    </div>
+</header>
+{% include 'expenses/group_messages.html' %}
+
+{# POST: envia uma nova solicitação de amizade pelo username #}
+<section class="se-groups-panel se-detail-panel" aria-labelledby="add-friend-heading">
+    <div class="se-detail-panel-heading">
+        <h2 id="add-friend-heading">Adicionar amigo</h2>
+    </div>
+    <div class="se-detail-panel-body">
+        <form method="post" class="se-group-form se-friend-add-form">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            <div class="se-group-field">
+                <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+                {{ form.username }}
+                {{ form.username.errors }}
+            </div>
+            <button type="submit" class="se-groups-button se-groups-button-primary">
+                <i class="fa-solid fa-user-plus" aria-hidden="true"></i> Enviar solicitação
+            </button>
+        </form>
+    </div>
+</section>
+
+{# Solicitações recebidas: aceitar por PUT e recusar por DELETE #}
+<section class="se-groups-panel se-detail-panel" aria-labelledby="requests-heading">
+    <div class="se-detail-panel-heading">
+        <h2 id="requests-heading">Solicitações recebidas</h2>
+    </div>
+    <div class="se-detail-table-wrap">
+        <table class="se-detail-table">
+            <thead><tr><th>Usuário</th><th>Solicitada em</th><th>Ações</th></tr></thead>
+            <tbody>
+                {% for friendship in incoming_requests %}
+                <tr>
+                    <td><strong>{{ friendship.from_user.username }}</strong></td>
+                    <td>{{ friendship.created_at|date:'d/m/Y H:i' }}</td>
+                    <td>
+                        <div class="se-detail-actions se-friend-actions">
+                            <form method="post" data-method="PUT" action="{% url 'friend_request_action' friendship.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" name="action" value="accept" class="se-btn-soft se-btn-soft-success" aria-label="Aceitar {{ friendship.from_user.username }}">
+                                    <i class="fa-solid fa-check" aria-hidden="true"></i> Aceitar
+                                </button>
+                            </form>
+                            <form method="post" data-method="DELETE" data-confirm="Recusar a solicitação de {{ friendship.from_user.username }}?" action="{% url 'friend_request_action' friendship.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" name="action" value="reject" class="se-btn-soft se-btn-soft-danger" aria-label="Recusar {{ friendship.from_user.username }}">
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i> Recusar
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="se-detail-empty">Você não tem solicitações recebidas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{# Solicitações enviadas: cancelar por DELETE #}
+<section class="se-groups-panel se-detail-panel" aria-labelledby="sent-heading">
+    <div class="se-detail-panel-heading">
+        <h2 id="sent-heading">Solicitações enviadas</h2>
+    </div>
+    <div class="se-detail-table-wrap">
+        <table class="se-detail-table">
+            <thead><tr><th>Usuário</th><th>Solicitada em</th><th>Ação</th></tr></thead>
+            <tbody>
+                {% for friendship in outgoing_requests %}
+                <tr>
+                    <td><strong>{{ friendship.to_user.username }}</strong></td>
+                    <td>{{ friendship.created_at|date:'d/m/Y H:i' }}</td>
+                    <td>
+                        <form method="post" data-method="DELETE" class="se-friend-inline-form" action="{% url 'friend_request_action' friendship.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" name="action" value="cancel" class="se-detail-action se-detail-danger">Cancelar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="se-detail-empty">Você não tem solicitações enviadas pendentes.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{# Lista de amigos: remover por DELETE com confirmação em modal #}
+<section class="se-groups-panel se-detail-panel" aria-labelledby="friends-heading">
+    <div class="se-detail-panel-heading">
+        <h2 id="friends-heading">Meus amigos</h2>
+    </div>
+    <div class="se-detail-table-wrap">
+        <table class="se-detail-table">
+            <thead><tr><th>Usuário</th><th>Nome</th><th>Ação</th></tr></thead>
+            <tbody>
+                {% for friend in friends %}
+                <tr>
+                    <td><strong>{{ friend.username }}</strong></td>
+                    <td>{{ friend.get_full_name|default:'—' }}</td>
+                    <td>
+                        <form method="post" data-method="DELETE" class="se-friend-inline-form" action="{% url 'friend_remove' friend.pk %}"
+                              data-confirm="Remover {{ friend.username }} da sua lista de amigos?" data-confirm-title="Remover amigo" data-confirm-ok="Sim, remover" data-confirm-danger="true">
+                            {% csrf_token %}
+                            <button type="submit" class="se-detail-action se-detail-danger">Remover</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="se-detail-empty">Você ainda não adicionou amigos.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

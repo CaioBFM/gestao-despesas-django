@@ -56,9 +56,8 @@ class ExpenseForm(forms.ModelForm):
 def parse_splits_from_post(post_data, accepted_memberships, total_amount=None):
     splits = {}
     errors = []
-    mode = post_data.get('split_mode', 'value')
-    if mode not in ('value', 'percentage'):
-        return {}, ['Modo de divisão inválido.']
+    if post_data.get('split_mode', 'value') != 'value':
+        return {}, ['Informe as divisões em reais.']
     selected = 0
 
     for membership in accepted_memberships:
@@ -86,17 +85,7 @@ def parse_splits_from_post(post_data, accepted_memberships, total_amount=None):
     if errors or total_amount is None or not total_amount.is_finite() or total_amount <= 0:
         return splits, errors
 
-    target = Decimal('100') if mode == 'percentage' else total_amount
-    if sum(splits.values(), Decimal('0')) != target:
-        errors.append('A soma dos percentuais deve ser exatamente 100%.' if mode == 'percentage'
-                      else 'A soma das divisões deve ser exatamente igual ao valor total da despesa.')
-    elif mode == 'percentage':
-        total_cents = int(total_amount * 100)
-        shares = {uid: divmod(total_cents * int(value * 100), 10000) for uid, value in splits.items()}
-        remaining = total_cents - sum(share[0] for share in shares.values())
-        winners = sorted(shares, key=lambda uid: (-shares[uid][1], uid))[:remaining]
-        splits = {uid: Decimal(cents + (uid in winners)) / 100 for uid, (cents, _) in shares.items()}
-        if any(value < Decimal('0.01') for value in splits.values()):
-            errors.append('Cada participante deve receber pelo menos R$ 0,01.')
+    if sum(splits.values(), Decimal('0')) != total_amount:
+        errors.append('A soma das divisões deve ser exatamente igual ao valor total da despesa.')
 
     return splits, errors

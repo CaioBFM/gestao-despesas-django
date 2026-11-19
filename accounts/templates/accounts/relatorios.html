@@ -1,0 +1,89 @@
+{% extends 'app_base.html' %}
+{% load static %}
+{% block titulo %}Relatórios - SplitExpenses{% endblock %}
+{% block pagina_titulo %}Relatórios{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}"><link rel="stylesheet" href="{% static 'css/expenses.css' %}">{% endblock %}
+{% block conteudo %}
+<header class="se-groups-heading">
+    <div>
+        <h1>Relatórios</h1>
+        <p>Visão geral do sistema. Esta página é exclusiva do administrador geral.</p>
+    </div>
+</header>
+{% include 'expenses/group_messages.html' %}
+
+{# Indicadores gerais #}
+<div class="se-detail-summary">
+    <article class="se-groups-panel se-detail-balance">
+        <span class="se-detail-icon" aria-hidden="true"><i class="fa-solid fa-user-group"></i></span>
+        <div><p>Usuários ativos</p><strong>{{ totals.users }}</strong></div>
+    </article>
+    <article class="se-groups-panel se-detail-balance">
+        <span class="se-detail-icon" aria-hidden="true"><i class="fa-solid fa-users"></i></span>
+        <div><p>Grupos ativos</p><strong>{{ totals.groups }}</strong></div>
+    </article>
+    <article class="se-groups-panel se-detail-balance">
+        <span class="se-detail-icon" aria-hidden="true"><i class="fa-solid fa-receipt"></i></span>
+        <div><p>Despesas cadastradas</p><strong>{{ totals.expenses }}</strong></div>
+    </article>
+</div>
+<div class="se-detail-summary">
+    <article class="se-groups-panel se-detail-balance">
+        <span class="se-detail-icon" aria-hidden="true"><i class="fa-solid fa-coins"></i></span>
+        <div><p>Valor total das despesas</p><strong>R$ {{ totals.amount|floatformat:2 }}</strong></div>
+    </article>
+    <article class="se-groups-panel se-detail-balance se-expense-paid">
+        <span class="se-detail-icon" aria-hidden="true"><i class="fa-solid fa-circle-check"></i></span>
+        <div><p>Cotas já quitadas</p><strong>R$ {{ totals.paid|floatformat:2 }}</strong></div>
+    </article>
+    <article class="se-groups-panel se-detail-balance se-detail-due">
+        <span class="se-detail-icon" aria-hidden="true"><i class="fa-solid fa-clock"></i></span>
+        <div><p>Cotas pendentes</p><strong>R$ {{ totals.pending|floatformat:2 }}</strong></div>
+    </article>
+</div>
+
+{# Resumo por grupo #}
+<section class="se-groups-panel se-detail-panel" aria-labelledby="report-groups-title">
+    <div class="se-detail-panel-heading"><h2 id="report-groups-title">Resumo por grupo</h2></div>
+    <div class="se-detail-table-wrap">
+        <table class="se-detail-table">
+            <thead><tr><th>Grupo</th><th>Membros</th><th>Despesas</th><th>Valor total</th><th>Pendente</th><th>Ação</th></tr></thead>
+            <tbody>
+                {% for row in group_rows %}
+                <tr>
+                    <td><strong>{{ row.group.name }}</strong></td>
+                    <td>{{ row.members }}</td>
+                    <td>{{ row.expenses }}</td>
+                    <td>R$ {{ row.amount|floatformat:2 }}</td>
+                    <td>{% if row.pending > 0 %}<span class="se-detail-badge se-detail-warning">R$ {{ row.pending|floatformat:2 }}</span>{% else %}<span class="se-detail-badge se-detail-success">Em dia</span>{% endif %}</td>
+                    <td><a href="{% url 'group_detail' row.group.pk %}" class="se-detail-action">Abrir</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="se-detail-empty">Nenhum grupo ativo cadastrado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{# Usuários com maior valor pendente #}
+<section class="se-groups-panel se-detail-panel" aria-labelledby="report-debtors-title">
+    <div class="se-detail-panel-heading"><h2 id="report-debtors-title">Maiores valores pendentes por usuário</h2></div>
+    <div class="se-detail-table-wrap">
+        <table class="se-detail-table">
+            <thead><tr><th>Usuário</th><th>Cotas pendentes</th><th>Total a pagar</th></tr></thead>
+            <tbody>
+                {% for debtor in top_debtors %}
+                <tr>
+                    <td><strong>{{ debtor.user__username }}</strong></td>
+                    <td>{{ debtor.splits }}</td>
+                    <td><span class="se-detail-badge se-detail-warning">R$ {{ debtor.total|floatformat:2 }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="se-detail-empty">Nenhuma pendência no sistema.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

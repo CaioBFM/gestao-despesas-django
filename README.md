@@ -1,6 +1,8 @@
+# Gestão de Despesas Django
+
 ## Descrição do Projeto
 
-O SplitExpenses é uma aplicação web para organizar despesas compartilhadas. Usuários podem criar grupos, convidar participantes, dividir despesas, acompanhar pagamentos, adicionar amigos pelo username e consultar seu histórico pessoal. O projeto foi desenvolvido com Django e arquitetura MVT, autenticação de usuários e persistência em banco de dados relacional.
+O SplitExpenses é uma aplicação web para organizar despesas compartilhadas entre pessoas, onde usuários criam grupos, convidam participantes por código, registram despesas pagas por membros do grupo e distribuem o valor em cotas em reais. A aplicação acompanha os valores pagos e pendentes, calcula saldos entre participantes, permite administrar amizades e grupos e oferece histórico pessoal e relatórios administrativos, e o sistema registra o estado das divisões, mas não movimenta dinheiro nem processa transferências.
 
 ---
 
@@ -16,14 +18,9 @@ O SplitExpenses é uma aplicação web para organizar despesas compartilhadas. U
 
 ## Tecnologias Utilizadas
 
-- **Python 3 e Django 6.1.1:** aplicação web, arquitetura MVT, autenticação, formulários e ORM.
-- **PostgreSQL:** banco de dados relacional.
-- **Jazzmin:** personalização do Django Admin.
-- **Bootstrap 5, CSS e JavaScript:** interface responsiva, componentes e temas claro/escuro.
-- **WhiteNoise:** publicação de arquivos estáticos.
-- **Git e GitHub:** controle de versão e colaboração.
+O backend é desenvolvido em Python 3 com Django 6.1.1, usando a arquitetura MVT, autenticação, formulários e ORM. O PostgreSQL armazena os dados relacionais. Jazzmin personaliza o Django Admin, enquanto Bootstrap 5, CSS e JavaScript formam a interface responsiva, com temas claro e escuro, modais e interações de formulário. WhiteNoise serve os arquivos estáticos em produção.
 
-O projeto possui dois aplicativos Django: `accounts`, para usuários e amizades, e `expenses`, para grupos e despesas.
+O projeto está dividido em dois aplicativos Django. `accounts` implementa usuários, autenticação, perfil, amizades e relatórios; `expenses` implementa grupos, participações, despesas, divisões, pagamentos, balanços e histórico. O pacote `gestao_despesas` reúne as configurações e rotas principais do projeto.
 
 ---
 
@@ -31,20 +28,20 @@ O projeto possui dois aplicativos Django: `accounts`, para usuários e amizades,
 
 Tenha Python, PostgreSQL e Git instalados. Os comandos abaixo são executados na raiz do repositório.
 
-### 1. Clonar o repositório
+### Clonar o repositório
 
 ```bash
 git clone https://github.com/GUSTAVO-ALESSANDRO/gestao-despesas-django.git
 cd gestao-despesas-django
 ```
 
-### 2. Criar e ativar o ambiente virtual
+### Criar e ativar o ambiente virtual
 
 ```bash
 python -m venv venv
 ```
 
-Ative o ambiente:
+Ative o ambiente virtual com o comando correspondente ao sistema operacional:
 
 ```powershell
 # Windows PowerShell
@@ -56,13 +53,13 @@ Ative o ambiente:
 source venv/bin/activate
 ```
 
-Instale as dependências:
+Com o ambiente ativo, instale as dependências:
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-### 3. Criar o banco PostgreSQL
+### Criar o banco PostgreSQL
 
 Crie um banco e usuário PostgreSQL. Exemplo no Linux:
 
@@ -71,11 +68,11 @@ sudo -u postgres createuser --pwprompt gestao_despesas
 sudo -u postgres createdb -O gestao_despesas gestao_despesas_db
 ```
 
-No Windows, a criação pode ser feita pelo pgAdmin ou por `psql`.
+No Windows, crie o banco e o usuário pelo pgAdmin ou pelo cliente `psql`.
 
-### 4. Configurar as variáveis de ambiente
+### Configurar as variáveis de ambiente
 
-Copie `.env.example` para `.env`:
+Copie `.env.example` para `.env` e edite o arquivo com os dados do banco e as configurações locais:
 
 ```powershell
 # Windows PowerShell
@@ -106,9 +103,9 @@ Gere uma chave secreta para desenvolvimento, se necessário:
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
-Não publique o arquivo `.env`. Em produção, use `DEBUG=False`, uma chave secreta própria e configure `ALLOWED_HOSTS` e as opções de segurança do ambiente.
+Em produção, use `DEBUG=False`, uma chave secreta própria e configure `ALLOWED_HOSTS` e as opções de segurança do ambiente.
 
-### 5. Aplicar migrations e criar o administrador
+### Aplicar migrations e criar o administrador
 
 ```bash
 python manage.py migrate
@@ -125,10 +122,7 @@ Com o PostgreSQL ativo e o ambiente virtual habilitado:
 python manage.py runserver
 ```
 
-Acesse:
-
-- Aplicação: <http://127.0.0.1:8000/>
-- Django Admin: <http://127.0.0.1:8000/admin/>
+A aplicação fica disponível em <http://127.0.0.1:8000/> e o painel Django Admin em <http://127.0.0.1:8000/admin/>.
 
 Para validar o projeto e executar a suíte de testes:
 
@@ -151,44 +145,41 @@ O usuário de demonstração `admin` tem senha `admin`; os demais usuários de e
 
 ---
 
-## Principais Funcionalidades
+## Funcionalidades
 
 ### Acesso e contas
 
-- Cadastro, login e logout com autenticação por usuário e senha.
-- Edição de nome, sobrenome e e-mail do perfil.
-- Papéis de usuário comum e administrador. O acesso ao Admin também depende das permissões Django (`is_staff`, permissões e `is_superuser`); `role=ADMIN` não concede superusuário.
-- Tema claro/escuro e navegação responsiva.
+O cadastro público cria contas comuns, e o acesso às páginas internas exige autenticação, na qual o usuário pode entrar e sair da sessão e alterar o nome, o sobrenome e o e-mail do perfil. O campo de papel distingue `USER` de `ADMIN`, mas o acesso ao Django Admin é controlado pelas permissões próprias do Django, como `is_staff`, permissões atribuídas e `is_superuser`; o valor `role=ADMIN`, isoladamente, não concede acesso administrativo.
+
+A interface adapta-se a diferentes tamanhos de tela e oferece tema claro ou escuro. Mensagens de confirmação e avisos são apresentados em modais quando aplicável.
 
 ### Grupos
 
-- Criar grupos; o criador é associado como membro aceito e administrador.
-- Código de convite gerado automaticamente para solicitar participação.
-- Aprovação de solicitações, promoção/rebaixamento de administradores e remoção de membros.
-- Administradores podem adicionar diretamente ao grupo um amigo com amizade aceita.
-- Regras para impedir saída/remoção com pendências financeiras e exclusão acidental do grupo.
+Ao criar um grupo, seu criador passa a ser membro aceito e administrador do grupo e cada grupo recebe um código de convite único, que pode ser informado por outra conta para solicitar entrada e a solicitação fica pendente até que um administrador do grupo a aceite ou recuse. Administradores também podem alterar o título, a descrição e o código de convite, promover membros aceitos, rebaixar administradores e adicionar diretamente amigos cuja amizade já foi aceita.
+
+Um grupo não pode ficar sem administrador enquanto ainda tiver outros participantes, o último administrador precisa promover outro administrador antes de sair ou ser removido. A saída também é bloqueada enquanto o usuário tiver obrigações financeiras pendentes no grupo, seja uma cota que deve pagar ou uma cota ainda devida a ele. A exclusão do grupo pela interface só é oferecida quando resta apenas o próprio usuário no grupo; é necessário confirmar a operação, e a exclusão é impedida se houver obrigações financeiras pendentes no grupo.
+
+Um membro não pode ser removido se for o último administrador ou se houver valores pendentes associados a ele, incluindo valores que deve pagar e valores que outros participantes ainda lhe devem. A remoção de um administrador também não pode deixar o grupo sem outro administrador.
 
 ### Amigos
 
-- Enviar solicitações pelo username.
-- Aceitar, recusar ou cancelar solicitações.
-- Consultar e remover amizades.
-- Solicitações recíprocas aceitam a solicitação pendente existente.
+Usuários podem enviar solicitações de amizade pelo username, aceitar ou recusar solicitações recebidas, cancelar solicitações enviadas e remover amizades já aceitas, mas não é permitido adicionar a própria conta. Quando existe uma solicitação pendente no sentido inverso, uma nova solicitação recíproca aceita a relação existente em vez de criar outra.
 
 ### Despesas e histórico
 
-- Criar, consultar, editar e excluir despesas de grupos, respeitando as permissões.
-- Dividir o valor por quantias ou porcentagens; o total das divisões deve corresponder ao valor da despesa.
-- Consultar participantes, balanços individuais e valores a pagar/receber.
-- Marcar divisões como pagas ou pendentes.
-- Histórico pessoal das despesas pagas diretamente pelo usuário, cotas quitadas e cotas ainda devidas, com filtro por situação.
-- O sistema registra pagamentos, mas não processa transferências financeiras.
+Uma despesa pertence a um grupo e registra título, descrição opcional, data, valor total, quem pagou e quem a cadastrou. O pagador e o responsável pelo cadastro precisam ser membros aceitos do grupo e o valor pode ser dividido manualmente entre os participantes aceitos ou repartido igualmente pela interface. Cada cota é informada em reais, precisa ser positiva e ter no máximo duas casas decimais, e a soma das cotas deve corresponder exatamente ao total da despesa.
+
+O criador da despesa, seu pagador, os administradores do grupo e o superusuário podem editar ou excluir a despesa, desde que as regras de acesso ao grupo sejam satisfeitas. As divisões mostram os valores devidos e seu estado de pagamento. Um participante autorizado pode marcar sua própria cota como paga ou pendente; o pagador não altera a própria cota, pois ela representa sua parte do valor que adiantou.
+
+As páginas de grupo e de despesa apresentam o total registrado, cotas pagas e pendentes e balanços entre participantes, o cálculo do saldo não trata a cota do próprio pagador como dívida dele para consigo mesmo e o histórico pessoal reúne despesas pagas diretamente pelo usuário e suas cotas em despesas de outras pessoas, com filtro para exibir todas, pendentes ou pagas. Esses registros representam o controle das obrigações no sistema, não uma confirmação de transferência bancária.
+
+### Relatórios
+
+Os relatórios gerais estão disponíveis somente para superusuários. A página apresenta indicadores de usuários e grupos ativos, quantidade e valor das despesas, valores pendentes e pagos, totais por grupo e uma lista dos usuários com maiores valores pendentes a pagar.
 
 ### Administração
 
-- Django Admin personalizado com Jazzmin em `/admin/`.
-- Administração de usuários, amizades, grupos, participações, despesas e divisões.
-- Filtros, buscas, formulários especializados e gráficos de cadastros nas listagens administrativas.
+O Django Admin personalizado com Jazzmin está disponível em `/admin/` para contas com permissões administrativas Django. O painel permite administrar usuários, amizades, grupos, participações, despesas e divisões, e as listagens incluem buscas e filtros, formulários especializados validam pagadores e participantes de despesas, e gráficos apresentam informações das listagens administrativas.
 
 ---
 
@@ -270,40 +261,49 @@ erDiagram
     }
 ```
 
-`GroupMembership` é único por grupo/usuário e `ExpenseSplit` é único por despesa/usuário. Amizades impedem relações consigo mesmo e têm status pendente ou aceito. Valores de despesas e divisões devem ser positivos. O pagador, o responsável pelo cadastro e os participantes das divisões precisam ser membros aceitos do grupo.
-
 ---
 
-## Rotas Disponíveis
+## Rotas e métodos HTTP
 
-As páginas de usuários finais exigem autenticação, exceto cadastro e login. Para operações de recursos, o projeto usa **GET para consultar**, **POST para criar**, **PUT para editar** e **DELETE para excluir**. Formulários HTML nativos só enviam GET/POST; a interface usa JavaScript `fetch` para enviar PUT/DELETE com o token CSRF.
+As rotas abaixo refletem os caminhos registrados pela aplicação. Formulários HTML usam `GET` para consulta, `POST` para criação, `PUT` para atualização e `DELETE` para remoção. Como formulários HTML nativos não enviam `PUT` ou `DELETE`, a interface usa `data-method` e o JavaScript em `static/js/app-ui.js` envia essas requisições por `fetch`, incluindo o token CSRF. As requisições de alteração enviam dados URL-encoded. Para requisições da interface, o servidor devolve o destino da navegação em JSON; para outros clientes, redireciona após a ação.
 
-| MÉTODO | ROTA | Explicação | Permissão |
-| --- | --- | --- | --- |
-| **GET** | `/` | Página inicial e resumo financeiro. | Usuário autenticado |
-| **GET, POST** | `/cadastro/` | Exibir e criar uma conta de usuário comum. | Público |
-| **GET, POST** | `/login/` | Exibir formulário e autenticar usuário. | Público |
-| **POST** | `/logout/` | Encerrar a sessão. | Usuário autenticado |
-| **GET, PUT** | `/perfil/` | Consultar e editar o perfil. | Usuário autenticado |
-| **GET, POST** | `/amigos/` | Listar amigos/solicitações e enviar pedido de amizade. | Usuário autenticado |
-| **PUT** | `/amigos/solicitacao/<friendship_id>/acao/` | Aceitar uma solicitação recebida (`action=accept`). | Destinatário |
-| **DELETE** | `/amigos/solicitacao/<friendship_id>/acao/` | Recusar ou cancelar solicitação (`action=decline`/`cancel`). | Destinatário/remetente |
-| **DELETE** | `/amigos/<user_id>/remover/` | Remover uma amizade aceita. | Usuário autenticado |
-| **GET** | `/groups/` | Listar os grupos do usuário. | Usuário autenticado |
-| **GET, POST** | `/groups/new/` | Exibir formulário e criar grupo. | Usuário autenticado |
-| **GET, PUT** | `/groups/<pk>/` | Consultar grupo ou editar suas informações (`action=update_info`). | Membro; edição por administrador |
-| **POST** | `/groups/join/` | Solicitar entrada usando código de convite. | Usuário autenticado |
-| **DELETE** | `/groups/<pk>/leave/` | Sair do grupo ou excluir o grupo quando for o único membro. | Membro |
-| **PUT, DELETE** | `/groups/<group_id>/members/<membership_id>/action/` | Aceitar/promover/rebaixar (`PUT`) ou remover membro (`DELETE`). | Administrador do grupo |
-| **POST** | `/groups/<pk>/add-friend/` | Adicionar amigo aceito ao grupo. | Administrador do grupo |
-| **GET, POST** | `/groups/<group_id>/expenses/new/` | Exibir formulário e criar despesa/divisões. | Membro aceito |
-| **GET** | `/groups/expenses/` | Listar despesas dos grupos do usuário. | Usuário autenticado |
-| **GET** | `/groups/expenses/<pk>/` | Consultar despesa e suas divisões. | Membro do grupo |
-| **GET, PUT** | `/groups/expenses/<pk>/edit/` | Exibir formulário e editar despesa/divisões. | Criador, pagador ou administrador |
-| **GET, DELETE** | `/groups/expenses/<pk>/delete/` | Exibir confirmação e excluir despesa. | Criador, pagador ou administrador |
-| **PUT** | `/groups/splits/<split_id>/toggle-paid/` | Atualizar o status de pagamento de uma divisão. | Usuário autorizado |
-| **GET** | `/groups/history/` | Consultar histórico; aceita `?status=pending` ou `?status=paid`. | Usuário autenticado |
-| **GET** | `/admin/` | Painel administrativo Jazzmin. | Usuário autenticado com permissões Django |
+| METODO | ROTA | O QUE FAZ | PERMISSÃO |
+|---|---|---|---|
+| GET | `/` | Exibe a página inicial e o resumo financeiro. | Usuário autenticado. |
+| GET | `/cadastro/` | Exibe o formulário de cadastro. | Público; usuários autenticados são redirecionados para a página inicial. |
+| POST | `/cadastro/` | Cria uma conta de usuário comum. | Público; usuários autenticados são redirecionados para a página inicial. |
+| GET | `/login/` | Exibe a página de login. | Público; usuários autenticados são redirecionados conforme a configuração da view. |
+| POST | `/login/` | Autentica o usuário. | Público. |
+| POST | `/logout/` | Encerra a sessão atual. | Não exige permissão específica; encerra a sessão do cliente. |
+| GET | `/perfil/` | Exibe os dados do perfil. | Usuário autenticado. |
+| PUT | `/perfil/` | Atualiza nome, sobrenome e e-mail do usuário autenticado. | Usuário autenticado; altera somente o próprio perfil. |
+| GET | `/amigos/` | Lista amizades e solicitações recebidas ou enviadas. | Usuário autenticado. |
+| POST | `/amigos/` | Envia uma solicitação de amizade pelo username. | Usuário autenticado. |
+| PUT | `/amigos/solicitacao/<int:friendship_id>/acao/` | Aceita uma solicitação pendente com `action=accept`. | Somente o destinatário da solicitação. |
+| DELETE | `/amigos/solicitacao/<int:friendship_id>/acao/` | Recusa uma solicitação com `action=reject` ou cancela com `action=cancel`. | Destinatário pode recusar; remetente pode cancelar. |
+| DELETE | `/amigos/<int:user_id>/remover/` | Remove uma amizade aceita. | Usuário autenticado que participa da amizade. |
+| GET | `/relatorios/` | Exibe os relatórios gerais do sistema. | Somente superusuário. |
+| GET | `/groups/` | Lista os grupos ativos dos quais o usuário participa com solicitação aceita. | Usuário autenticado. |
+| GET | `/groups/new/` | Exibe o formulário de criação de grupo. | Usuário autenticado. |
+| POST | `/groups/new/` | Cria um grupo e associa o criador como administrador. | Usuário autenticado. |
+| GET | `/groups/<int:pk>/` | Exibe os dados, participantes, despesas e saldos do grupo. | Participante com entrada aceita ou superusuário. |
+| PUT | `/groups/<int:pk>/` | Atualiza título, descrição e código de convite com `action=update_info`. | Administrador participante do grupo. |
+| POST | `/groups/join/` | Solicita entrada em um grupo usando o código de convite. | Usuário autenticado. |
+| DELETE | `/groups/<int:pk>/leave/` | Remove a participação do usuário ou, se for o único participante, exclui o grupo mediante confirmação. | Usuário com participação registrada; o último administrador não pode sair enquanto houver outros participantes, e pendências financeiras impedem a saída ou exclusão. |
+| PUT | `/groups/<int:group_id>/members/<int:membership_id>/action/` | Aceita um pedido (`action=accept`), promove (`action=promote`) ou rebaixa (`action=demote`) um participante. | Administrador participante do grupo; não é permitido rebaixar o último administrador. |
+| DELETE | `/groups/<int:group_id>/members/<int:membership_id>/action/` | Remove um participante ou recusa um pedido de entrada (`action=kick`). | Administrador participante do grupo; não pode remover o último administrador nem participante com pendências financeiras. |
+| POST | `/groups/<int:pk>/add-friend/` | Adiciona diretamente ao grupo um amigo com amizade aceita. | Administrador participante do grupo; a pessoa adicionada precisa ser sua amizade aceita. |
+| GET | `/groups/<int:group_id>/expenses/new/` | Exibe o formulário de criação de despesa e suas divisões. | Participante aceito do grupo ou superusuário. |
+| POST | `/groups/<int:group_id>/expenses/new/` | Cria uma despesa e suas divisões em reais. | Participante aceito do grupo ou superusuário. |
+| GET | `/groups/expenses/` | Lista as despesas dos grupos do usuário. | Usuário autenticado; lista somente despesas de grupos nos quais tem participação aceita. |
+| GET | `/groups/expenses/<int:pk>/` | Exibe os dados da despesa, suas cotas e os estados de pagamento. | Participante aceito do grupo da despesa ou superusuário. |
+| GET | `/groups/expenses/<int:pk>/edit/` | Exibe o formulário de edição da despesa. | Criador da despesa, pagador, administrador do grupo ou superusuário. |
+| PUT | `/groups/expenses/<int:pk>/edit/` | Atualiza a despesa e suas divisões. | Criador da despesa, pagador, administrador do grupo ou superusuário. |
+| GET | `/groups/expenses/<int:pk>/delete/` | Exibe a confirmação de exclusão da despesa. | Criador da despesa, pagador, administrador do grupo ou superusuário. |
+| DELETE | `/groups/expenses/<int:pk>/delete/` | Exclui a despesa e suas divisões. | Criador da despesa, pagador, administrador do grupo ou superusuário. |
+| PUT | `/groups/splits/<int:split_id>/toggle-paid/` | Alterna o estado de uma cota entre paga e a pagar. | Participante responsável pela cota ou pessoa autorizada a gerenciar a despesa; não é possível alternar a cota própria do pagador. |
+| GET | `/groups/history/` | Exibe o histórico financeiro pessoal; aceita `?status=pending` ou `?status=paid` para filtrar cotas. | Usuário autenticado. |
+| GET, POST (conforme a operação) | `/admin/` e rotas internas geradas pelo Django | Abre o painel administrativo Django/Jazzmin e suas páginas internas de consulta, cadastro e edição. | Usuário staff autenticado com as permissões Django correspondentes. |
 
 ---
 
@@ -313,6 +313,8 @@ As páginas de usuários finais exigem autenticação, exceto cadastro e login. 
 gestao-despesas-django/
 ├── manage.py
 ├── README.md
+├── LICENSE
+├── .gitignore
 ├── requirements.txt
 ├── .env.example
 ├── .env                         # criado localmente; não versionado
@@ -321,16 +323,33 @@ gestao-despesas-django/
 │   ├── settings.py
 │   ├── urls.py
 │   ├── asgi.py
-│   └── wsgi.py
+│   ├── wsgi.py
+│   └── http.py
 ├── accounts/
 │   ├── migrations/
+│   │   ├── 0001_initial.py
+│   │   ├── 0002_restricoes_e_metadados.py
+│   │   └── 0003_friendship.py
 │   ├── templates/
 │   │   ├── accounts/
+│   │   │   ├── auth_base.html
+│   │   │   ├── cadastro.html
+│   │   │   ├── footer.html
+│   │   │   ├── friends.html
+│   │   │   ├── login.html
+│   │   │   ├── navbar.html
+│   │   │   ├── perfil.html
+│   │   │   └── relatorios.html
 │   │   ├── admin/
+│   │   │   └── users.html
+│   │   ├── 404.html
+│   │   ├── 500.html
 │   │   ├── app_base.html
 │   │   ├── base.html
 │   │   └── index.html
 │   ├── admin.py
+│   ├── apps.py
+│   ├── filters.py
 │   ├── forms.py
 │   ├── models.py
 │   ├── services.py
@@ -339,10 +358,29 @@ gestao-despesas-django/
 │   └── tests.py
 ├── expenses/
 │   ├── migrations/
+│   │   ├── 0001_initial.py
+│   │   ├── 0002_invite_code_opcional.py
+│   │   ├── 0003_restricoes_e_metadados.py
+│   │   └── 0004_associate_group_creators.py
 │   ├── templates/
 │   │   ├── admin/
+│   │   │   ├── expense.html
+│   │   │   ├── expensesplit.html
+│   │   │   ├── groupmembership.html
+│   │   │   └── groups.html
 │   │   └── expenses/
+│   │       ├── expense_confirm_delete.html
+│   │       ├── expense_detail.html
+│   │       ├── expense_form.html
+│   │       ├── expense_list_all.html
+│   │       ├── group_detail.html
+│   │       ├── group_form.html
+│   │       ├── group_list.html
+│   │       ├── group_messages.html
+│   │       └── personal_history.html
 │   ├── admin.py
+│   ├── apps.py
+│   ├── filters.py
 │   ├── forms.py
 │   ├── models.py
 │   ├── services.py
@@ -351,16 +389,21 @@ gestao-despesas-django/
 │   └── tests.py
 ├── static/
 │   ├── css/
+│   │   ├── app-shell.css
+│   │   ├── app-ui.css
+│   │   ├── auth.css
+│   │   ├── dashboard.css
+│   │   ├── expenses.css
+│   │   ├── groups.css
+│   │   └── theme.css
 │   └── js/
+│       ├── app-ui.js
+│       ├── charts.js
+│       ├── http-method-forms.js
+│       └── theme.js
 └── staticfiles/                  # arquivos estáticos coletados
 ```
 
-- **`gestao_despesas/`**: configurações globais, banco, autenticação e rotas principais.
-- **`accounts/`**: usuário customizado, autenticação, perfil, amizades e administração de contas.
-- **`expenses/`**: grupos, membros, despesas, divisões, validações e cálculo de balanços.
-- **`static/`**: estilos e scripts da interface. Em produção, execute `python manage.py collectstatic`.
-- **`staticfiles/`**: diretório de saída dos arquivos estáticos coletados.
+`gestao_despesas/` contém as configurações do Django, as rotas raiz e os auxiliares para leitura de formulários e redirecionamento após requisições PUT e DELETE, `accounts/` concentra o modelo de usuário customizado, as amizades, formulários, serviços, views, rotas, testes e templates de autenticação, perfil e relatórios, já `expenses/` reúne os modelos e validações de grupos, participações, despesas e divisões, os cálculos de balanço, as regras de acesso, as rotas, os testes e os templates das telas de grupos, despesas e histórico.
 
-## Controle de Versão e Colaboração
-
-O fluxo de trabalho previsto utiliza Git e GitHub, com as branches `main` (versão estável), `develop` (integração) e `feature/<assunto>` (funcionalidades). As alterações devem ser integradas por pull requests.
+`static/css/` contém os estilos da aplicação, enquanto `static/js/` contém o controle dos modais e do envio de métodos PUT/DELETE, dos temas e dos gráficos administrativos. Em produção, `python manage.py collectstatic` reúne os arquivos estáticos em `staticfiles/`, diretório de saída servido pelo WhiteNoise.

@@ -1,0 +1,202 @@
+/* Modal de confirmação e aviso (substitui confirm/alert nativos do navegador) */
+.se-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.se-modal[hidden] {
+    display: none;
+}
+
+/* Fundo escurecido atrás do modal */
+.se-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+}
+
+/* Caixa do modal */
+.se-modal-dialog {
+    position: relative;
+    width: min(440px, 100%);
+    background: var(--bs-body-bg, #fff);
+    color: var(--bs-body-color, #212529);
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 1rem;
+    padding: 1.75rem 1.5rem 1.25rem;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+    text-align: center;
+    animation: se-modal-in 0.16s ease-out;
+}
+
+@keyframes se-modal-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Ícone circular do topo */
+.se-modal-icon {
+    width: 3.25rem;
+    height: 3.25rem;
+    margin: 0 auto 0.9rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    background: #e7efff;
+    color: #2f5fd0;
+}
+
+.se-modal[data-tone="danger"] .se-modal-icon {
+    background: #fde3e3;
+    color: #b42323;
+}
+
+.se-modal-dialog h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 0 0 0.4rem;
+}
+
+.se-modal-dialog p {
+    margin: 0 0 1.25rem;
+    color: var(--bs-secondary-color, #6c757d);
+    line-height: 1.45;
+}
+
+/* Botões de ação do modal */
+.se-modal-actions {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.se-modal-actions .se-groups-button {
+    min-width: 8.5rem;
+    justify-content: center;
+}
+
+.se-modal-danger {
+    background: #c62f2f;
+    border: 1px solid #c62f2f;
+    color: #fff;
+}
+
+.se-modal-danger:hover,
+.se-modal-danger:focus-visible {
+    background: #a82424;
+    border-color: #a82424;
+    color: #fff;
+}
+
+/* Impede rolagem da página ao fundo enquanto o modal está aberto */
+body.se-modal-open {
+    overflow: hidden;
+}
+
+/* Botões "suaves" coloridos (verde = marcar como paga, vermelho = marcar como a pagar) */
+.se-btn-soft {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.42rem 0.85rem;
+    border-radius: 0.6rem;
+    border: 1px solid transparent;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, transform 0.05s;
+}
+
+.se-btn-soft:active {
+    transform: translateY(1px);
+}
+
+.se-btn-soft:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.se-btn-soft-success {
+    background: #dcf5e4;
+    border-color: #b6e6c7;
+    color: #146c3a;
+}
+
+.se-btn-soft-success:hover {
+    background: #c8eed7;
+}
+
+.se-btn-soft-danger {
+    background: #fde3e3;
+    border-color: #f5bcbc;
+    color: #a12727;
+}
+
+.se-btn-soft-danger:hover {
+    background: #fbd0d0;
+}
+
+/* Variações para o tema escuro */
+[data-bs-theme="dark"] .se-modal-dialog {
+    background: #1d232d;
+    border-color: #343c49;
+    color: #e8ecf2;
+}
+
+[data-bs-theme="dark"] .se-modal-icon {
+    background: rgba(80, 130, 240, 0.2);
+    color: #9db9ff;
+}
+
+[data-bs-theme="dark"] .se-modal[data-tone="danger"] .se-modal-icon {
+    background: rgba(230, 80, 80, 0.2);
+    color: #ff9d9d;
+}
+
+[data-bs-theme="dark"] .se-btn-soft-success {
+    background: rgba(46, 160, 90, 0.2);
+    border-color: rgba(46, 160, 90, 0.4);
+    color: #86e3ac;
+}
+
+[data-bs-theme="dark"] .se-btn-soft-success:hover {
+    background: rgba(46, 160, 90, 0.3);
+}
+
+[data-bs-theme="dark"] .se-btn-soft-danger {
+    background: rgba(230, 80, 80, 0.2);
+    border-color: rgba(230, 80, 80, 0.4);
+    color: #ffa3a3;
+}
+
+[data-bs-theme="dark"] .se-btn-soft-danger:hover {
+    background: rgba(230, 80, 80, 0.3);
+}
+
+/* Formulário de edição das informações do grupo */
+.se-group-edit-form {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.se-group-edit-form textarea {
+    resize: vertical;
+    min-height: 4.5rem;
+}

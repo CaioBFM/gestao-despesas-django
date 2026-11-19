@@ -14,4 +14,10 @@ urlpatterns = [
         name="login",
         ),
     path("perfil/", views.perfil_usuario, name="perfil"),
+    path("amigos/", views.friends_list, name="friends_list"),
+    path("amigos/solicitacao/<int:friendship_id>/acao/", views.friend_request_action, name="friend_request_action"),
+    path("amigos/<int:user_id>/remover/", views.friend_remove, name="friend_remove"),
+    
+    # Relatórios gerais (somente admin geral)
+    path("relatorios/", views.relatorios, name="relatorios"),
 ]

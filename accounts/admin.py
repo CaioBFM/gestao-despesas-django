@@ -6,7 +6,7 @@ from django.contrib.auth.forms import UserChangeForm
 from django.forms.widgets import Widget
 from django.utils.safestring import mark_safe
 from django.utils import timezone
-from .models import CustomUser
+from .models import CustomUser, Friendship
 from .filters import GroupParticipationFilter
 
 # Remove a seção de grupos nativos do Django do painel para manter a interface limpa
@@ -116,3 +116,11 @@ class CustomUserAdmin(UserAdmin):
                 for created_at in users
             ]
         return response
+
+
+@admin.register(Friendship)
+class FriendshipAdmin(admin.ModelAdmin):
+    list_display = ('from_user', 'to_user', 'status', 'created_at', 'updated_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('from_user__username', 'to_user__username')
+    readonly_fields = ('created_at', 'updated_at')
