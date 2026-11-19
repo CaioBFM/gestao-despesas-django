@@ -40,3 +40,52 @@
     .se-group-form-panel { padding: 20px; }
     .se-group-actions { flex-wrap: wrap; }
 }
+
+/* Detalhes do grupo. */
+.se-detail-back { display: inline-flex; gap: 8px; align-items: center; margin-bottom: 20px; color: var(--se-muted); font-size: 12px; font-weight: 600; text-decoration: none; }
+.se-detail-back:hover { color: var(--se-primary); }
+.se-detail-heading h1, .se-detail-heading p { overflow-wrap: anywhere; }
+.se-invite-code { min-width: 0; }
+.se-invite-code label, .se-invite-code small { display: block; color: var(--se-muted); font-size: 11px; }
+.se-invite-code label { margin-bottom: 5px; }
+.se-invite-code > div { display: flex; gap: 8px; }
+.se-invite-code input { min-width: 0; width: 125px; padding: 8px 10px; color: var(--se-text); background: var(--se-surface); border: 1px solid var(--se-border); border-radius: 9px; font-weight: 600; }
+.se-detail-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 20px; }
+.se-detail-balance { display: flex; align-items: center; gap: 15px; min-width: 0; padding: 20px; }
+.se-detail-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 12px; background: var(--se-primary-soft); color: var(--se-primary); }
+.se-detail-balance p { margin: 0 0 4px; color: var(--se-muted); font-size: 12px; }
+.se-detail-balance strong { color: var(--se-text); font-size: 21px; overflow-wrap: anywhere; }
+.se-detail-due .se-detail-icon { background: var(--se-danger-soft); color: var(--se-danger); }
+.se-detail-due strong { color: var(--se-danger); }
+.se-detail-panel { margin-bottom: 20px; overflow: hidden; }
+.se-detail-panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 22px; border-bottom: 1px solid var(--se-border); }
+.se-detail-panel h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.se-detail-table-wrap { max-width: 100%; overflow-x: auto; }
+.se-detail-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+.se-detail-table th, .se-detail-table td { padding: 13px 16px; border-bottom: 1px solid var(--se-border); vertical-align: middle; }
+.se-detail-table th { color: var(--se-muted); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.se-detail-table td { color: var(--se-text); }
+.se-detail-table tr:last-child td { border-bottom: 0; }
+.se-detail-table td small { display: block; margin-top: 4px; color: var(--se-muted); }
+.se-detail-table td strong { overflow-wrap: anywhere; }
+.se-detail-badge { display: inline-block; padding: 4px 8px; border-radius: 7px; background: var(--se-surface-2); color: var(--se-muted); font-size: 11px; white-space: nowrap; }
+.se-detail-success { background: var(--se-success-soft); color: var(--se-success); }
+.se-detail-warning { background: var(--se-danger-soft); color: var(--se-danger); }
+.se-detail-info { background: var(--se-primary-soft); color: var(--se-primary); }
+.se-detail-actions { display: flex; gap: 6px; align-items: center; }
+.se-detail-action { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; min-height: 34px; padding: 6px 9px; border: 1px solid var(--se-border); border-radius: 8px; background: var(--se-surface); color: var(--se-primary); font-size: 12px; text-decoration: none; }
+.se-detail-action:hover { background: var(--se-surface-2); color: var(--se-primary-hover); }
+.se-detail-danger, .se-detail-danger:hover { color: var(--se-danger); }
+.se-detail-empty { padding: 32px !important; color: var(--se-muted) !important; text-align: center; }
+.se-detail-admin { padding: 22px; }
+.se-detail-admin h2 { margin-bottom: 18px; }
+.se-detail-admin-form { display: grid; grid-template-columns: 2fr 1fr; gap: 0 16px; }
+.se-detail-admin-form .se-groups-button { grid-column: 1 / -1; justify-self: start; }
+.se-detail-leave { display: flex; justify-content: flex-end; }
+.se-detail-leave button:disabled { opacity: .55; cursor: not-allowed; }
+@media (max-width: 720px) {
+    .se-detail-summary, .se-detail-admin-form { grid-template-columns: 1fr; }
+    .se-detail-panel-heading { align-items: flex-start; flex-wrap: wrap; }
+    .se-detail-balance { padding: 16px; }
+    .se-detail-admin-form .se-groups-button { grid-column: auto; }
+}

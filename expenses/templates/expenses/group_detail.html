@@ -1,212 +1,87 @@
-{% extends 'base.html' %}
-{% block titulo %}{{ group.name }} - Detalhes{% endblock %}
+{% extends 'app_base.html' %}
+{% load static %}
+{% block titulo %}{{ group.name }} - SplitExpenses{% endblock %}
+{% block pagina_titulo %}Grupos{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/groups.css' %}">{% endblock %}
 {% block conteudo %}
-<div class="row mb-4">
-    <div class="col-md-8">
-        <h1 class="fw-bold text-primary"><i class="fas fa-layer-group me-2"></i>{{ group.name }}</h1>
-        <p class="text-muted">{{ group.description }}</p>
+<a href="{% url 'group_list' %}" class="se-detail-back"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Voltar aos grupos</a>
+<header class="se-groups-heading se-detail-heading">
+    <div><h1>{{ group.name }}</h1><p>{{ group.description|default:'Grupo compartilhado' }}</p></div>
+    <div class="se-invite-code">
+        <label for="group-invite-code">Código de convite</label>
+        <div><input id="group-invite-code" value="{{ group.invite_code }}" readonly aria-label="Código de convite"><button type="button" class="se-groups-button se-groups-button-secondary" id="copy-invite" aria-label="Copiar código de convite"><i class="fa-regular fa-copy" aria-hidden="true"></i> Copiar</button></div>
+        <small id="copy-feedback" role="status"></small>
     </div>
-    <div class="col-md-4 text-md-end">
-        <div class="card bg-body-tertiary border-0 p-2 shadow-sm d-inline-block">
-            <span class="small text-muted d-block">Código de Convite:</span>
-            <strong class="fs-4 text-dark">{{ group.invite_code }}</strong>
-        </div>
-    </div>
+</header>
+{% include 'expenses/group_messages.html' %}
+
+<div class="se-detail-summary">
+    <article class="se-groups-panel se-detail-balance"><span class="se-detail-icon"><i class="fa-solid fa-receipt" aria-hidden="true"></i></span><div><p>Total em despesas do grupo</p><strong>R$ {{ total_group_amount|floatformat:2 }}</strong></div></article>
+    <article class="se-groups-panel se-detail-balance se-detail-due"><span class="se-detail-icon"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></span><div><p>Seu total pendente a pagar</p><strong>R$ {{ total_to_pay_by_user|floatformat:2 }}</strong></div></article>
 </div>
+
+<section class="se-groups-panel se-detail-panel" aria-labelledby="expenses-title">
+    <div class="se-detail-panel-heading"><h2 id="expenses-title">Despesas do grupo</h2><a href="{% url 'expense_create' group.pk %}" class="se-groups-button se-groups-button-primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Nova despesa</a></div>
+    <div class="se-detail-table-wrap"><table class="se-detail-table">
+        <thead><tr><th>Título</th><th>Data</th><th>Pago por</th><th>Valor total</th><th>Sua participação</th><th>Quitação</th><th>Ações</th></tr></thead>
+        <tbody>
+        {% for item in expense_items %}
+        <tr>
+            <td><strong>{{ item.expense.title }}</strong>{% if item.expense.description %}<small>{{ item.expense.description|truncatechars:60 }}</small>{% endif %}</td>
+            <td>{{ item.expense.date|date:'d/m/Y' }}</td><td>{{ item.expense.paid_by.username }}</td><td><strong>R$ {{ item.expense.amount|floatformat:2 }}</strong></td>
+            <td>{% if item.user_status == 'Paga' %}<span class="se-detail-badge se-detail-success">Paga (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>{% elif item.user_status == 'A pagar' %}<span class="se-detail-badge se-detail-warning">A pagar (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>{% elif item.user_status == 'Cota própria' %}<span class="se-detail-badge se-detail-info">Cota própria (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>{% else %}<span class="se-detail-badge">Não participa</span>{% endif %}</td>
+            <td>{{ item.paid_splits_count }}/{{ item.total_splits_count }} quitadas</td>
+            <td><div class="se-detail-actions"><a href="{% url 'expense_detail' item.expense.pk %}" class="se-detail-action">Ver</a>{% if item.can_manage %}<a href="{% url 'expense_update' item.expense.pk %}" class="se-detail-action" aria-label="Editar {{ item.expense.title }}" title="Editar"><i class="fa-solid fa-pen" aria-hidden="true"></i></a><a href="{% url 'expense_delete' item.expense.pk %}" class="se-detail-action se-detail-danger" aria-label="Excluir {{ item.expense.title }}" title="Excluir"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>{% endif %}</div></td>
+        </tr>
+        {% empty %}<tr><td colspan="7" class="se-detail-empty">Nenhuma despesa cadastrada neste grupo ainda.</td></tr>{% endfor %}
+        </tbody>
+    </table></div>
+</section>
+
+<section class="se-groups-panel se-detail-panel" aria-labelledby="members-title">
+    <div class="se-detail-panel-heading"><h2 id="members-title">Participantes</h2></div>
+    <div class="se-detail-table-wrap"><table class="se-detail-table">
+        <thead><tr><th>Usuário</th><th>E-mail</th><th>Status</th><th>Perfil</th><th>Ações</th></tr></thead>
+        <tbody>{% for m in members %}
+        <tr>
+            <td><strong>{{ m.user.username }}</strong> {% if m.user == group.created_by %}<span class="se-detail-badge">Criador</span>{% endif %}</td>
+            <td>{{ m.user.email }}</td><td>{% if m.is_accepted %}<span class="se-detail-badge se-detail-success">Aceito</span>{% else %}<span class="se-detail-badge se-detail-warning">Pendente</span>{% endif %}</td>
+            <td>{% if m.is_group_admin %}<span class="se-detail-badge se-detail-info">Admin do grupo</span>{% else %}<span class="se-detail-badge">Membro</span>{% endif %}</td>
+            <td>{% if is_admin and m.user != request.user %}
+                <form method="post" action="{% url 'member_action' group.pk m.pk %}" class="se-detail-actions">{% csrf_token %}
+                    {% if not m.is_accepted %}<button type="submit" name="action" value="accept" class="se-detail-action" title="Aceitar" aria-label="Aceitar {{ m.user.username }}"><i class="fa-solid fa-check" aria-hidden="true"></i></button>{% endif %}
+                    {% if m.is_accepted %}{% if m.is_group_admin %}<button type="submit" name="action" value="demote" class="se-detail-action" title="Remover cargo de admin" aria-label="Remover cargo de admin de {{ m.user.username }}"><i class="fa-solid fa-user-minus" aria-hidden="true"></i></button>{% else %}<button type="submit" name="action" value="promote" class="se-detail-action" title="Tornar admin" aria-label="Tornar {{ m.user.username }} administrador"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></button>{% endif %}{% endif %}
+                    <button type="submit" name="action" value="kick" class="se-detail-action se-detail-danger" title="Expulsar" aria-label="Expulsar {{ m.user.username }}"><i class="fa-solid fa-user-xmark" aria-hidden="true"></i></button>
+                </form>{% endif %}</td>
+        </tr>{% endfor %}</tbody>
+    </table></div>
+</section>
 
 {% if is_admin %}
-<div class="card shadow-sm mb-4 border-primary">
-    <div class="card-header bg-primary text-white fw-bold"><i class="fas fa-cogs me-1"></i> Painel do Administrador do Grupo</div>
-    <div class="card-body">
-        <form method="post" class="row g-3">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="update_info">
-            <div class="col-md-8">
-                <label class="form-label">Descrição:</label>
-                <input type="text" name="description" class="form-control" value="{{ group.description }}">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Alterar Código de Convite:</label>
-                <input type="text" name="invite_code" class="form-control" value="{{ group.invite_code }}">
-            </div>
-            <div class="col-12">
-                <button type="submit" class="btn btn-sm btn-outline-primary">Salvar Alterações do Grupo</button>
-            </div>
-        </form>
-    </div>
-</div>
-{% endif %}
-
-<!-- Seção de Despesas do Grupo -->
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0"><i class="fas fa-receipt me-2"></i>Despesas do Grupo</h3>
-    <a href="{% url 'expense_create' group.pk %}" class="btn btn-primary">
-        <i class="fas fa-plus me-1"></i> Nova Despesa
-    </a>
-</div>
-
-<div class="row mb-3 g-2">
-    <div class="col-md-6">
-        <div class="card shadow-sm bg-body-tertiary border-0">
-            <div class="card-body py-2">
-                <span class="small text-muted d-block">Total em Despesas do Grupo</span>
-                <strong class="fs-5">R$ {{ total_group_amount|floatformat:2 }}</strong>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card shadow-sm bg-body-tertiary border-0">
-            <div class="card-body py-2">
-                <span class="small text-muted d-block">Seu Total Pendente a Pagar neste Grupo</span>
-                <strong class="fs-5 text-warning">R$ {{ total_to_pay_by_user|floatformat:2 }}</strong>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="card shadow-sm mb-5">
-    <div class="card-body p-0">
-        <table class="table table-hover mb-0 align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th>Título</th>
-                    <th>Data</th>
-                    <th>Pago por</th>
-                    <th>Valor Total</th>
-                    <th>Sua Participação</th>
-                    <th>Quitação</th>
-                    <th class="text-end">Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in expense_items %}
-                <tr>
-                    <td>
-                        <strong>{{ item.expense.title }}</strong>
-                        {% if item.expense.description %}
-                            <div class="small text-muted">{{ item.expense.description|truncatechars:60 }}</div>
-                        {% endif %}
-                    </td>
-                    <td>{{ item.expense.date|date:"d/m/Y" }}</td>
-                    <td>{{ item.expense.paid_by.username }}</td>
-                    <td><strong>R$ {{ item.expense.amount|floatformat:2 }}</strong></td>
-                    <td>
-                        {% if item.user_status == 'Paga' %}
-                            <span class="badge bg-success">Paga (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>
-                        {% elif item.user_status == 'A pagar' %}
-                            <span class="badge bg-warning text-dark">A pagar (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>
-                        {% elif item.user_status == 'Cota própria' %}
-                            <span class="badge bg-info text-dark">Cota própria (R$ {{ item.user_split.amount_owed|floatformat:2 }})</span>
-                        {% else %}
-                            <span class="badge bg-secondary">Não participa</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <span class="small text-muted">{{ item.paid_splits_count }}/{{ item.total_splits_count }} quitadas</span>
-                    </td>
-                    <td class="text-end">
-                        <a href="{% url 'expense_detail' item.expense.pk %}" class="btn btn-sm btn-outline-primary">
-                            Ver
-                        </a>
-                        {% if item.can_manage %}
-                            <a href="{% url 'expense_update' item.expense.pk %}" class="btn btn-sm btn-outline-secondary" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <a href="{% url 'expense_delete' item.expense.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir">
-                                <i class="fas fa-trash"></i>
-                            </a>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
-                        Nenhuma despesa cadastrada neste grupo ainda.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<h3 class="mb-3"><i class="fas fa-users me-2"></i>Participantes</h3>
-<div class="card shadow-sm mb-4">
-    <div class="card-body p-0">
-        <table class="table table-hover mb-0 align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th>Usuário</th>
-                    <th>E-mail</th>
-                    <th>Status</th>
-                    <th>Perfil</th>
-                    <th class="text-end">Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for m in members %}
-                <tr>
-                    <td>{{ m.user.username }} {% if m.user == group.created_by %}<span class="badge bg-dark">Criador</span>{% endif %}</td>
-                    <td>{{ m.user.email }}</td>
-                    <td>
-                        {% if m.is_accepted %}
-                            <span class="badge bg-success">Aceito</span>
-                        {% else %}
-                            <span class="badge bg-warning text-dark">Pendente</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if m.is_group_admin %}
-                            <span class="badge bg-primary">Admin do Grupo</span>
-                        {% else %}
-                            <span class="badge bg-secondary">Membro</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-end">
-                        {% if is_admin and m.user != request.user %}
-                            <form method="post" action="{% url 'member_action' group.pk m.pk %}" class="d-inline">
-                                {% csrf_token %}
-                                {% if not m.is_accepted %}
-                                    <button type="submit" name="action" value="accept" class="btn btn-sm btn-success" title="Aceitar"><i class="fas fa-check"></i></button>
-                                {% endif %}
-                                
-                                {% if m.is_accepted %}
-                                    {% if m.is_group_admin %}
-                                        <button type="submit" name="action" value="demote" class="btn btn-sm btn-outline-secondary" title="Remover cargo de Admin"><i class="fas fa-user-shield"></i> <i class="fas fa-minus small"></i></button>
-                                    {% else %}
-                                        <button type="submit" name="action" value="promote" class="btn btn-sm btn-outline-dark" title="Tornar Admin"><i class="fas fa-shield-alt"></i></button>
-                                    {% endif %}
-                                {% endif %}
-
-                                <button type="submit" name="action" value="kick" class="btn btn-sm btn-danger" title="Expulsar"><i class="fas fa-user-times"></i></button>
-                            </form>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-{% if leave_blocked %}
-<div class="alert alert-warning" role="alert">
-    Você é o último administrador deste grupo. Promova outro participante a administrador antes de sair.
-</div>
-{% endif %}
-
-<div class="d-flex justify-content-between">
-    <a href="{% url 'group_list' %}" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Voltar aos Grupos</a>
-
-    <form method="post" action="{% url 'group_leave' group.pk %}">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-danger"
-                {% if is_only_member %}name="confirm_delete" value="yes"{% endif %}
-                {% if leave_blocked %}disabled{% endif %}
-                onclick="return confirm('{% if is_only_member %}O grupo e todas as despesas serão excluídos permanentemente. Deseja confirmar?{% else %}Deseja realmente sair deste grupo?{% endif %}');">
-            <i class="fas fa-sign-out-alt me-1"></i> {% if is_only_member %}Excluir Grupo e Sair{% else %}Sair do Grupo{% endif %}
-        </button>
+<section class="se-groups-panel se-detail-panel se-detail-admin" aria-labelledby="admin-title">
+    <h2 id="admin-title">Administração do grupo</h2>
+    <form method="post" class="se-detail-admin-form">{% csrf_token %}<input type="hidden" name="action" value="update_info">
+        <div class="se-group-field"><label for="group-description">Descrição</label><input id="group-description" type="text" name="description" class="form-control" value="{{ group.description|default_if_none:'' }}"></div>
+        <div class="se-group-field"><label for="group-code">Alterar código de convite</label><input id="group-code" type="text" name="invite_code" class="form-control" value="{{ group.invite_code }}"></div>
+        <button type="submit" class="se-groups-button se-groups-button-secondary">Salvar alterações do grupo</button>
     </form>
-
-</div>
+</section>
+{% endif %}
+{% if leave_blocked %}<div class="alert alert-warning" role="alert">Você é o último administrador deste grupo. Promova outro participante a administrador antes de sair.</div>{% endif %}
+<form method="post" action="{% url 'group_leave' group.pk %}" class="se-detail-leave">{% csrf_token %}
+    <button type="submit" class="se-groups-button se-groups-button-secondary se-detail-danger" {% if is_only_member %}name="confirm_delete" value="yes"{% endif %} {% if leave_blocked %}disabled{% endif %} onclick="return confirm('{% if is_only_member %}O grupo e todas as despesas serão excluídos permanentemente. Deseja confirmar?{% else %}Deseja realmente sair deste grupo?{% endif %}');"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> {% if is_only_member %}Excluir Grupo e Sair{% else %}Sair do Grupo{% endif %}</button>
+</form>
+<script>
+    document.getElementById('copy-invite').addEventListener('click', async function () {
+        const code = document.getElementById('group-invite-code');
+        const feedback = document.getElementById('copy-feedback');
+        try {
+            await navigator.clipboard.writeText(code.value);
+            feedback.textContent = 'Código copiado.';
+        } catch (_) {
+            code.select();
+            feedback.textContent = 'Selecione e copie o código de convite.';
+        }
+    });
+</script>
 {% endblock %}
