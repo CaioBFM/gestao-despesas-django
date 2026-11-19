@@ -421,3 +421,60 @@ class ExpenseAccessTests(TestCase):
         self.assertTrue(self.split.is_paid)
         self.client.post(reverse('expense_delete', args=[self.expense.pk]))
         self.assertFalse(Expense.objects.filter(pk=self.expense.pk).exists())
+
+
+class GroupFinancialDepartureTests(TestCase):
+    def setUp(self):
+        self.admin = CustomUser.objects.create_user(username='financial_admin')
+        self.member = CustomUser.objects.create_user(username='financial_member')
+        self.group = Group.objects.create(name='Grupo financeiro', created_by=self.admin)
+        self.membership = GroupMembership.objects.create(group=self.group, user=self.member, is_accepted=True)
+        self.leave = reverse('group_leave', args=[self.group.pk])
+        self.kick = reverse('member_action', args=[self.group.pk, self.membership.pk])
+
+    def make_split(self, payer, debtor):
+        expense = Expense.objects.create(group=self.group, paid_by=payer, created_by=payer, title='Despesa', amount=Decimal('10.00'), date=date(2026, 11, 19))
+        return ExpenseSplit.objects.create(expense=expense, user=debtor, amount_owed=Decimal('10.00'))
+
+    def test_saida_bloqueada_por_dividas_a_pagar_e_receber(self):
+        self.client.force_login(self.member)
+        for payer, debtor in ((self.admin, self.member), (self.member, self.admin)):
+            with self.subTest(payer=payer):
+                split = self.make_split(payer, debtor)
+                response = self.client.post(self.leave, follow=True)
+                self.assertContains(response, 'pendências financeiras')
+                self.assertTrue(GroupMembership.objects.filter(pk=self.membership.pk).exists())
+                split.is_paid = True
+                split.save()
+        self.make_split(self.member, self.member)
+        self.client.post(self.leave)
+        self.assertFalse(GroupMembership.objects.filter(pk=self.membership.pk).exists())
+
+    def test_remocao_bloqueada_por_dividas_a_pagar_e_receber(self):
+        self.client.force_login(self.admin)
+        for payer, debtor in ((self.admin, self.member), (self.member, self.admin)):
+            with self.subTest(payer=payer):
+                split = self.make_split(payer, debtor)
+                response = self.client.post(self.kick, {'action': 'kick'}, follow=True)
+                self.assertContains(response, 'pendências financeiras')
+                self.assertTrue(GroupMembership.objects.filter(pk=self.membership.pk).exists())
+                split.is_paid = True
+                split.save()
+        self.make_split(self.member, self.member)
+        self.client.post(self.kick, {'action': 'kick'})
+        self.assertFalse(GroupMembership.objects.filter(pk=self.membership.pk).exists())
+
+    def test_unico_membro_nao_exclui_grupo_com_divida_entre_ex_membros(self):
+        other = CustomUser.objects.create_user(username='former_member')
+        other_membership = GroupMembership.objects.create(group=self.group, user=other, is_accepted=True)
+        split = self.make_split(self.member, other)
+        self.membership.delete()
+        other_membership.delete()
+        self.client.force_login(self.admin)
+        response = self.client.post(self.leave, {'confirm_delete': 'yes'}, follow=True)
+        self.assertContains(response, 'pendências financeiras')
+        self.assertTrue(Group.objects.filter(pk=self.group.pk).exists())
+        self.assertTrue(ExpenseSplit.objects.filter(pk=split.pk).exists())
+        ExpenseSplit.objects.filter(pk=split.pk).update(is_paid=True)
+        self.client.post(self.leave, {'confirm_delete': 'yes'})
+        self.assertFalse(Group.objects.filter(pk=self.group.pk).exists())

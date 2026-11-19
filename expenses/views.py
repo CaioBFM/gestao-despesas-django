@@ -4,6 +4,7 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
+from django.db.models import F, Q
 from .models import Group, GroupMembership, Expense, ExpenseSplit
 from .forms import GroupForm, JoinGroupForm, ExpenseForm, parse_splits_from_post
 
@@ -28,6 +29,15 @@ def _is_last_group_admin(membership):
             group=membership.group, is_accepted=True, is_group_admin=True,
         ).exclude(pk=membership.pk).exists()
     )
+
+
+def _has_pending_obligations(group, user=None):
+    splits = ExpenseSplit.objects.filter(expense__group=group, is_paid=False).exclude(
+        user_id=F('expense__paid_by_id')
+    )
+    if user is not None:
+        splits = splits.filter(Q(user=user) | Q(expense__paid_by=user))
+    return splits.exists()
 
 
 def _can_manage_expense(user, expense, group, membership=None):
@@ -236,6 +246,8 @@ def member_action(request, group_id, membership_id):
     elif action == 'kick':
         if _is_last_group_admin(target_membership):
             messages.error(request, 'O último administrador não pode ser removido.')
+        elif _has_pending_obligations(group, target_membership.user):
+            messages.warning(request, 'Há pendências financeiras que precisam ser quitadas antes da remoção do membro.')
         else:
             target_membership.delete()
             messages.success(request, 'Membro removido do grupo.')
@@ -251,6 +263,9 @@ def group_leave(request, pk):
     membership = get_object_or_404(GroupMembership, user=request.user, group=group)
 
     if not GroupMembership.objects.filter(group=group).exclude(pk=membership.pk).exists():
+        if _has_pending_obligations(group):
+            messages.warning(request, 'Há pendências financeiras que precisam ser quitadas antes da saída e exclusão do grupo.')
+            return redirect('group_detail', pk=group.pk)
         if request.POST.get('confirm_delete') != 'yes':
             messages.warning(request, 'Confirme a exclusão permanente do grupo e de todas as despesas para sair.')
             return redirect('group_detail', pk=group.pk)
@@ -260,6 +275,9 @@ def group_leave(request, pk):
 
     if _is_last_group_admin(membership):
         messages.warning(request, 'Você é o último administrador deste grupo. Promova outro participante a administrador antes de sair.')
+        return redirect('group_detail', pk=group.pk)
+    elif _has_pending_obligations(group, request.user):
+        messages.warning(request, 'Há pendências financeiras que precisam ser quitadas antes da saída do grupo.')
         return redirect('group_detail', pk=group.pk)
     else:
         membership.delete()
