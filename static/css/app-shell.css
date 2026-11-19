@@ -1,0 +1,120 @@
+
+/* SplitExpenses — Layout autenticado, isolado do Django Admin e do login. */
+.se-app-body {
+    --se-muted: #526170;
+    margin: 0;
+    background: var(--se-bg);
+    color: var(--se-text);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+}
+[data-bs-theme="dark"] .se-app-body { --se-muted: #E1E7ED; }
+.se-app-body *, .se-app-body *::before, .se-app-body *::after { box-sizing: border-box; }
+.se-app { min-height: 100vh; background: var(--se-bg); }
+.se-sidebar {
+    position: fixed; inset: 0 auto 0 0; width: 238px; z-index: 40;
+    background: var(--se-surface); border-right: 1px solid var(--se-border);
+    padding: 27px 17px 20px; display: flex; flex-direction: column;
+}
+.se-sidebar-header { padding: 0 9px 30px; display: flex; align-items: center; justify-content: space-between; }
+.se-app-brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    color: var(--se-text); text-decoration: none; font-size: 17px;
+    font-weight: 700; letter-spacing: -.65px; white-space: nowrap;
+}
+.se-app-brand:hover { color: var(--se-text); }
+.se-app-brand-accent { color: var(--se-primary); }
+.se-app-brand-icon {
+    width: 33px; height: 33px; display: grid; place-items: center;
+    border-radius: 11px; background: var(--se-primary-soft); color: var(--se-text);
+}
+.se-app-brand-icon svg { width: 24px; height: 24px; }
+.se-side-nav { display: flex; flex-direction: column; gap: 5px; }
+.se-side-link {
+    display: flex; gap: 13px; align-items: center; padding: 0 13px; width: 100%;
+    min-height: 43px; border: none; border-radius: 10px;
+    background: transparent; color: var(--se-muted); text-decoration: none;
+    font: 500 13px/1.3 Inter, sans-serif; text-align: left;
+}
+.se-side-link i { width: 16px; font-size: 14px; text-align: center; }
+.se-side-link:is(a,button):hover { color: var(--se-text); background: var(--se-surface-2); }
+.se-side-link-active, .se-side-link-active:is(a,button):hover {
+    background: var(--se-primary-soft); color: var(--se-primary); font-weight: 600;
+}
+.se-side-link-disabled { opacity: .88; cursor: default; }
+.se-side-divider { margin: 10px 12px; border-top: 1px solid var(--se-border); }
+.se-sidebar-bottom { margin-top: auto; border-top: 1px solid var(--se-border); padding-top: 14px; }
+.se-theme-btn { cursor: pointer; }
+.se-theme-switch {
+    margin-left: auto; width: 30px; height: 18px; border-radius: 15px;
+    background: var(--se-border); padding: 3px; display: flex; align-items: center;
+}
+.se-theme-switch span { width: 12px; height: 12px; border-radius: 50%; background: var(--se-surface); transition: transform .2s; }
+[data-bs-theme="dark"] .se-theme-switch { background: var(--se-primary); }
+[data-bs-theme="dark"] .se-theme-switch span { transform: translateX(12px); }
+.se-app-main { margin-left: 238px; min-height: 100vh; }
+.se-topbar {
+    height: 72px; display: flex; align-items: center; justify-content: space-between;
+    gap: 20px; padding: 0 36px; position: sticky; top: 0; z-index: 20;
+    background: var(--se-bg); border-bottom: 1px solid var(--se-border);
+}
+.se-topbar-start, .se-user-toolbar { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.se-topbar-title { font-size: 14px; font-weight: 600; }
+.se-user-avatar {
+    width: 35px; height: 35px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--se-primary-soft); color: var(--se-primary); font-size: 11px;
+    font-weight: 700; flex: none;
+}
+.se-user-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.se-admin-link { color: var(--se-muted); font-size: 12px; text-decoration: none; margin-left: 12px; }
+.se-admin-link:hover { color: var(--se-primary); }
+.se-logout-form { margin: 0 0 0 8px; }
+.se-logout-form button {
+    border: 1px solid var(--se-border); background: var(--se-surface); color: var(--se-muted);
+    border-radius: 9px; padding: 8px 11px; display: flex; align-items: center;
+    gap: 8px; font-size: 12px; font-weight: 500; cursor: pointer;
+}
+.se-logout-form button:hover { color: var(--se-danger); border-color: var(--se-danger); }
+.se-page-content { width: min(100%, 1240px); margin: 0 auto; padding: 40px 40px 70px; }
+.se-close-sidebar, .se-mobile-menu, .se-mobile-bottom-nav { display: none; }
+.se-sidebar-overlay[hidden] { display: none; }
+.se-sidebar-overlay {
+    display: block; position: fixed; inset: 0; border: 0; background: rgba(13, 28, 42, .38);
+    z-index: 30; cursor: pointer;
+}
+@media (max-width: 980px) {
+    .se-sidebar { width: 215px; }
+    .se-app-main { margin-left: 215px; }
+    .se-page-content { padding: 30px 28px 65px; }
+}
+@media (max-width: 720px) {
+    .se-sidebar { width: min(288px, 85vw); transform: translateX(-101%); transition: transform .22s ease; }
+    .se-sidebar.se-sidebar-open { transform: translateX(0); }
+    .se-close-sidebar { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--se-muted); width: 32px; height: 32px; }
+    .se-nav-open { overflow: hidden; }
+    .se-app-main { margin-left: 0; padding-bottom: 66px; }
+    .se-topbar { height: 62px; padding: 0 18px; }
+    .se-topbar-title { display: none; }
+    .se-mobile-menu { display: inline-flex; align-items: center; justify-content: center; width: 35px; height: 35px; color: var(--se-text); border: 0; background: transparent; font-size: 17px; }
+    .se-user-name { max-width: 110px; }
+    .se-logout-form button span { display: none; }
+    .se-admin-link { display: none; }
+    .se-page-content { padding: 28px 18px 48px; }
+    .se-mobile-bottom-nav {
+        position: fixed; display: grid; grid-template-columns: repeat(4, 1fr);
+        bottom: 0; left: 0; right: 0; height: 66px; z-index: 25;
+        background: var(--se-surface); border-top: 1px solid var(--se-border);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    .se-mobile-bottom-nav > * {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 5px; border: 0; background: transparent; color: var(--se-muted);
+        text-decoration: none; font-size: 10px; font-weight: 500;
+    }
+    .se-mobile-bottom-nav i { font-size: 16px; }
+    .se-mobile-bottom-nav .se-bottom-active { color: var(--se-primary); font-weight: 600; }
+    .se-mobile-bottom-nav .se-bottom-disabled { opacity: .85; }
+}
+@media (max-width: 420px) {
+    .se-user-toolbar { gap: 7px; }
+    .se-user-name { max-width: 90px; }
+}
