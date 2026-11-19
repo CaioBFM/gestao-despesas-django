@@ -1,12 +1,71 @@
-{% extends 'app_base.html' %}
+{% extends "app_base.html" %}
+{% load static %}
 
 {% block titulo %}Início - SplitExpenses{% endblock %}
 {% block pagina_titulo %}Início{% endblock %}
+{% block estilos_pagina %}<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">{% endblock %}
 
 {% block conteudo %}
-<div class="p-4 mb-4 rounded-4" style="background:var(--se-surface); border:1px solid var(--se-border);">
-    <h1 class="h4 fw-bold mb-2">Início</h1>
-    <p class="mb-0" style="color:var(--se-muted)">Sua área de despesas compartilhadas.</p>
+<header class="se-dashboard-heading">
+    <h1>Início</h1>
+    <p>Suas despesas compartilhadas.</p>
+</header>
+
+<section class="se-dashboard-balances" aria-label="Resumo financeiro">
+    <article class="se-dashboard-balance se-dashboard-due">
+        <span class="se-dashboard-icon" aria-hidden="true"><i class="fa-solid fa-arrow-up"></i></span>
+        <div>
+            <p>Você deve</p>
+            <strong>{% if resumo_disponivel %}R$ {{ total_devido|floatformat:2 }}{% else %}—{% endif %}</strong>
+            <small>{% if resumo_disponivel %}Total pendente{% else %}Aguardando dados financeiros{% endif %}</small>
+        </div>
+    </article>
+    <article class="se-dashboard-balance se-dashboard-receive">
+        <span class="se-dashboard-icon" aria-hidden="true"><i class="fa-solid fa-arrow-down"></i></span>
+        <div>
+            <p>A receber</p>
+            <strong>{% if resumo_disponivel %}R$ {{ total_receber|floatformat:2 }}{% else %}—{% endif %}</strong>
+            <small>{% if resumo_disponivel %}Total pendente{% else %}Aguardando dados financeiros{% endif %}</small>
+        </div>
+    </article>
+</section>
+
+<div class="se-dashboard-columns">
+    <section class="se-dashboard-panel" aria-labelledby="se-dashboard-groups-title">
+        <h2 id="se-dashboard-groups-title">Seus grupos</h2>
+        {% for grupo in grupos_recentes %}
+            <div class="se-dashboard-row">
+                <span class="se-dashboard-row-icon" aria-hidden="true"><i class="fa-solid fa-users"></i></span>
+                <div class="se-dashboard-row-info">
+                    <strong>{{ grupo.name }}</strong>
+                    <small>{{ grupo.description|default:"Grupo compartilhado" }}</small>
+                </div>
+            </div>
+        {% empty %}
+            <div class="se-dashboard-empty">
+                <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                <p>Os grupos aparecerão aqui quando os dados forem integrados.</p>
+            </div>
+        {% endfor %}
+    </section>
+
+    <section class="se-dashboard-panel" aria-labelledby="se-dashboard-expenses-title">
+        <h2 id="se-dashboard-expenses-title">Atividades recentes</h2>
+        {% for despesa in despesas_recentes %}
+            <div class="se-dashboard-row">
+                <span class="se-dashboard-row-icon" aria-hidden="true"><i class="fa-solid fa-receipt"></i></span>
+                <div class="se-dashboard-row-info">
+                    <strong>{{ despesa.title }}</strong>
+                    <small>{{ despesa.group.name }} · {{ despesa.date|date:"d/m/Y" }}</small>
+                </div>
+                <span class="se-dashboard-amount">R$ {{ despesa.amount|floatformat:2 }}</span>
+            </div>
+        {% empty %}
+            <div class="se-dashboard-empty">
+                <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                <p>As atividades aparecerão aqui quando os dados forem integrados.</p>
+            </div>
+        {% endfor %}
+    </section>
 </div>
-<p style="color:var(--se-muted); font-size:13px;">A estrutura de navegação já está pronta. Os dados financeiros serão conectados ao dashboard em uma próxima etapa.</p>
 {% endblock %}
