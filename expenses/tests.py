@@ -378,3 +378,46 @@ class GroupAdministrationTests(TestCase):
         response = self.client.get(reverse('group_detail', args=[self.group.pk]))
         self.assertContains(response, 'value="demote"')
         self.assertContains(response, 'value="kick"')
+
+
+class ExpenseAccessTests(TestCase):
+    def setUp(self):
+        self.owner = CustomUser.objects.create_user(username='owner')
+        self.admin = CustomUser.objects.create_user(username='admin2')
+        self.group = Group.objects.create(name='Grupo', created_by=self.admin)
+        self.membership = GroupMembership.objects.create(group=self.group, user=self.owner, is_accepted=True)
+        self.expense = Expense.objects.create(group=self.group, paid_by=self.owner, created_by=self.owner, title='Compra', amount=Decimal('10.00'), date=date(2026, 11, 19))
+        self.split = ExpenseSplit.objects.create(expense=self.expense, user=self.owner, amount_owed=Decimal('10.00'))
+        self.client.force_login(self.owner)
+
+    def test_ex_membro_e_pendente_nao_podem_alterar_despesa_ou_pagamento(self):
+        self.membership.delete()
+        for pending in (False, True):
+            if pending:
+                GroupMembership.objects.create(group=self.group, user=self.owner, is_accepted=False)
+            for url in (reverse('expense_update', args=[self.expense.pk]), reverse('expense_delete', args=[self.expense.pk]), reverse('split_toggle_paid', args=[self.split.pk])):
+                self.client.post(url, {})
+            self.expense.refresh_from_db()
+            self.split.refresh_from_db()
+            self.assertFalse(self.split.is_paid)
+            self.assertEqual(self.expense.title, 'Compra')
+
+    def test_membro_autorizado_pode_editar_alterar_pagamento_e_excluir(self):
+        data = {'title': 'Alterada', 'amount': '10.00', 'date': '2026-11-19', 'paid_by': self.owner.pk, f'split_participates_{self.owner.pk}': 'on', f'split_amount_{self.owner.pk}': '10.00'}
+        self.client.post(reverse('expense_update', args=[self.expense.pk]), data)
+        self.expense.refresh_from_db()
+        self.assertEqual(self.expense.title, 'Alterada')
+        self.client.post(reverse('split_toggle_paid', args=[self.split.pk]))
+        self.split.refresh_from_db()
+        self.assertTrue(self.split.is_paid)
+        self.client.post(reverse('expense_delete', args=[self.expense.pk]))
+        self.assertFalse(Expense.objects.filter(pk=self.expense.pk).exists())
+
+    def test_superusuario_sem_vinculo_pode_alterar_pagamento_e_excluir(self):
+        user = CustomUser.objects.create_superuser(username='super', password='senha')
+        self.client.force_login(user)
+        self.client.post(reverse('split_toggle_paid', args=[self.split.pk]))
+        self.split.refresh_from_db()
+        self.assertTrue(self.split.is_paid)
+        self.client.post(reverse('expense_delete', args=[self.expense.pk]))
+        self.assertFalse(Expense.objects.filter(pk=self.expense.pk).exists())

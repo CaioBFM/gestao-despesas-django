@@ -33,9 +33,19 @@ def _is_last_group_admin(membership):
 def _can_manage_expense(user, expense, group, membership=None):
     if user.is_superuser:
         return True
+    if membership is None:
+        membership = _get_accepted_membership(user, group)
+    if not membership or not membership.is_accepted:
+        return False
     if expense.created_by_id == user.pk or expense.paid_by_id == user.pk:
         return True
     return _is_group_admin_or_superuser(user, group, membership)
+
+
+def _can_toggle_split(user, split, membership):
+    return _can_manage_expense(user, split.expense, split.expense.group, membership) or bool(
+        membership and membership.is_accepted and split.user_id == user.pk
+    )
 
 
 def _user_participation_status(user, expense):
@@ -365,7 +375,7 @@ def expense_detail(request, pk):
 
     splits_with_perms = []
     for s in expense.splits.all():
-        can_toggle = can_manage or (s.user_id == request.user.pk)
+        can_toggle = _can_toggle_split(request.user, s, membership)
         splits_with_perms.append({
             'split': s,
             'can_toggle': can_toggle,
@@ -510,10 +520,7 @@ def split_toggle_paid(request, split_id):
     group = expense.group
     membership = _get_accepted_membership(request.user, group)
 
-    can_manage = _can_manage_expense(request.user, expense, group, membership)
-    is_debtor = (split.user_id == request.user.pk)
-
-    if not (can_manage or is_debtor):
+    if not _can_toggle_split(request.user, split, membership):
         messages.error(request, 'Você não tem permissão para alterar o pagamento desta divisão.')
         return redirect('expense_detail', pk=expense.pk)
 
