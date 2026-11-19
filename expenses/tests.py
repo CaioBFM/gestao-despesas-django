@@ -8,7 +8,7 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.test import Client, TestCase
 
-from accounts.models import CustomUser
+from accounts.models import CustomUser, Friendship
 from .models import Group, GroupMembership, Expense, ExpenseSplit
 
 
@@ -343,6 +343,42 @@ class GroupAdministrationTests(TestCase):
         self.creator_membership.refresh_from_db()
         self.assertFalse(self.creator_membership.is_group_admin)
 
+    def test_promover_rebaixar_aceitar_e_recusar_membro_por_post(self):
+        other_action_url = reverse('member_action', args=[self.group.pk, self.other_membership.pk])
+        response = self.client.post(other_action_url, {'action': 'promote'})
+        self.assertRedirects(response, reverse('group_detail', args=[self.group.pk]))
+        self.other_membership.refresh_from_db()
+        self.assertTrue(self.other_membership.is_group_admin)
+
+        self.client.post(other_action_url, {'action': 'demote'})
+        self.other_membership.refresh_from_db()
+        self.assertFalse(self.other_membership.is_group_admin)
+
+        pending_user = CustomUser.objects.create_user(username='pending_member')
+        pending = GroupMembership.objects.create(
+            group=self.group, user=pending_user, is_accepted=False,
+        )
+        self.client.post(reverse('member_action', args=[self.group.pk, pending.pk]), {'action': 'accept'})
+        pending.refresh_from_db()
+        self.assertTrue(pending.is_accepted)
+
+        self.client.post(reverse('member_action', args=[self.group.pk, pending.pk]), {'action': 'kick'})
+        self.assertFalse(GroupMembership.objects.filter(pk=pending.pk).exists())
+
+    def test_atualizar_titulo_descricao_e_codigo_do_grupo_por_post(self):
+        response = self.client.post(reverse('group_detail', args=[self.group.pk]), {
+            'action': 'update_info',
+            'name': 'Novo título',
+            'description': 'Nova descrição',
+            'invite_code': 'NOVO99',
+        })
+
+        self.assertRedirects(response, reverse('group_detail', args=[self.group.pk]))
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.name, 'Novo título')
+        self.assertEqual(self.group.description, 'Nova descrição')
+        self.assertEqual(self.group.invite_code, 'NOVO99')
+
     def test_atualizar_grupo_nao_readiciona_criador_que_saiu(self):
         self.add_other_admin()
         self.client.post(self.leave_url)
@@ -423,6 +459,50 @@ class ExpenseAccessTests(TestCase):
         self.assertFalse(Expense.objects.filter(pk=self.expense.pk).exists())
 
 
+class FriendsInGroupsTests(TestCase):
+    def setUp(self):
+        self.admin = CustomUser.objects.create_user(username='group_admin', password='senha')
+        self.friend = CustomUser.objects.create_user(username='approved_friend', password='senha')
+        self.outsider = CustomUser.objects.create_user(username='not_friend', password='senha')
+        self.group = Group.objects.create(name='Amigos', created_by=self.admin)
+        self.add_url = reverse('group_add_friend', args=[self.group.pk])
+        Friendship.objects.create(
+            from_user=self.admin,
+            to_user=self.friend,
+            status=Friendship.STATUS_ACCEPTED,
+        )
+        self.client.force_login(self.admin)
+
+    def test_admin_adiciona_amigo_aceito_diretamente_ao_grupo(self):
+        response = self.client.post(self.add_url, {'friend_id': self.friend.pk})
+
+        self.assertRedirects(response, reverse('group_detail', args=[self.group.pk]))
+        membership = GroupMembership.objects.get(group=self.group, user=self.friend)
+        self.assertTrue(membership.is_accepted)
+        self.assertFalse(membership.is_group_admin)
+
+    def test_nao_adiciona_usuario_que_nao_e_amigo(self):
+        response = self.client.post(self.add_url, {'friend_id': self.outsider.pk}, follow=True)
+
+        self.assertContains(response, 'não está na sua lista de amigos')
+        self.assertFalse(GroupMembership.objects.filter(group=self.group, user=self.outsider).exists())
+
+    def test_usuario_que_nao_e_admin_nao_pode_adicionar_amigo(self):
+        member = CustomUser.objects.create_user(username='regular_member', password='senha')
+        GroupMembership.objects.create(group=self.group, user=member, is_accepted=True)
+        Friendship.objects.create(
+            from_user=member,
+            to_user=self.friend,
+            status=Friendship.STATUS_ACCEPTED,
+        )
+        self.client.force_login(member)
+
+        response = self.client.post(self.add_url, {'friend_id': self.friend.pk}, follow=True)
+
+        self.assertContains(response, 'Apenas administradores')
+        self.assertFalse(GroupMembership.objects.filter(group=self.group, user=self.friend).exists())
+
+
 class GroupFinancialDepartureTests(TestCase):
     def setUp(self):
         self.admin = CustomUser.objects.create_user(username='financial_admin')
@@ -501,44 +581,33 @@ class SplitAmountValidationTests(TestCase):
             with self.subTest(value=value):
                 self.assertTrue(self.parse([value])[1])
 
-    def test_percentuais_diferentes_de_cem(self):
-        for value in ('99.99', '100.01'):
-            with self.subTest(value=value):
-                self.assertTrue(self.parse([value], 'percentage')[1])
-
-    def test_percentuais_validos_e_maiores_restos(self):
-        splits, errors = self.parse(['33.33', '33.33', '33.34'], 'percentage')
-        self.assertFalse(errors)
-        self.assertEqual([splits[u.pk] for u in self.users], [Decimal('3.33'), Decimal('3.33'), Decimal('3.34')])
-        splits, errors = self.parse(['50', '50'], 'percentage', '0.03')
-        self.assertFalse(errors)
-        self.assertEqual([splits[u.pk] for u in self.users[:2]], [Decimal('0.02'), Decimal('0.01')])
+    def test_divisao_em_percentual_nao_e_aceita(self):
+        splits, errors = self.parse(['100'], 'percentage')
+        self.assertFalse(splits)
+        self.assertEqual(errors, ['Informe as divisões em reais.'])
 
     def test_entradas_invalidas_e_divisao_menor_que_um_centavo(self):
         for value in ('0', '-1', 'NaN', 'Infinity', 'abc', '0.001'):
             with self.subTest(value=value):
                 self.assertTrue(self.parse([value])[1])
-        self.assertTrue(self.parse(['50', '50'], 'percentage', '0.01')[1])
-
     def test_formulario_preserva_campos_invalidos(self):
         self.client.force_login(self.users[0])
-        data = {'title': 'Teste', 'amount': '10.00', 'date': '2026-11-19', 'paid_by': self.users[0].pk, 'split_mode': 'percentage', f'split_participates_{self.users[0].pk}': 'on', f'split_amount_{self.users[0].pk}': 'inválido'}
+        data = {'title': 'Teste', 'amount': '10.00', 'date': '2026-11-19', 'paid_by': self.users[0].pk, f'split_participates_{self.users[0].pk}': 'on', f'split_amount_{self.users[0].pk}': 'inválido'}
         response = self.client.post(reverse('expense_create', args=[self.group.pk]), data)
         self.assertContains(response, 'value="inválido"')
-        self.assertContains(response, 'value="percentage" selected')
+        self.assertNotContains(response, 'Porcentagem (%)')
 
-    def test_cria_despesa_com_percentuais_em_reais(self):
+    def test_rejeita_percentual_enviado_manualmente(self):
         self.client.force_login(self.users[0])
-        data = {'title': 'Percentual', 'amount': '0.03', 'date': '2026-11-19',
+        data = {'title': 'Percentual', 'amount': '10.00', 'date': '2026-11-19',
                 'paid_by': self.users[0].pk, 'split_mode': 'percentage'}
         for user in self.users[:2]:
             data[f'split_participates_{user.pk}'] = 'on'
             data[f'split_amount_{user.pk}'] = '50'
         response = self.client.post(reverse('expense_create', args=[self.group.pk]), data)
-        self.assertEqual(response.status_code, 302)
-        expense = Expense.objects.get(group=self.group, title='Percentual')
-        amounts = dict(expense.splits.values_list('user_id', 'amount_owed'))
-        self.assertEqual(amounts, {self.users[0].pk: Decimal('0.02'), self.users[1].pk: Decimal('0.01')})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Informe as divisões em reais.')
+        self.assertFalse(Expense.objects.filter(group=self.group, title='Percentual').exists())
 
 
 class ExpenseBalanceDisplayTests(TestCase):
@@ -699,6 +768,7 @@ class ParticipantBalanceTests(TestCase):
         split.expense.delete()
         self.assertEqual(self.balances()[self.alice.pk]['net_amount'], Decimal('7.00'))
 
+
     def test_balanco_na_pagina_das_duas_perspectivas_e_atualizacao(self):
         from django.utils.html import strip_tags
         first = self.add_obligation(self.alice, self.me, '1666.00')
@@ -738,3 +808,73 @@ class ParticipantBalanceTests(TestCase):
         self.assertContains(response, f'href="{url}"', count=1)
         self.assertContains(response, escape(self.group.name))
         self.assertContains(response, 'Acessar grupo')
+
+
+class PersonalHistoryTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(username='history_user', password='senha')
+        self.other = CustomUser.objects.create_user(username='history_other', password='senha')
+        self.group = Group.objects.create(name='Histórico', created_by=self.user)
+        GroupMembership.objects.create(group=self.group, user=self.other, is_accepted=True)
+        self.paid_expense = Expense.objects.create(
+            group=self.group,
+            paid_by=self.user,
+            created_by=self.user,
+            title='Paguei no local',
+            amount=Decimal('50.00'),
+            date=date(2026, 11, 1),
+        )
+        ExpenseSplit.objects.create(
+            expense=self.paid_expense,
+            user=self.user,
+            amount_owed=Decimal('20.00'),
+        )
+        self.pending_expense = Expense.objects.create(
+            group=self.group,
+            paid_by=self.other,
+            created_by=self.other,
+            title='Ainda devo',
+            amount=Decimal('20.00'),
+            date=date(2026, 11, 2),
+        )
+        ExpenseSplit.objects.create(
+            expense=self.pending_expense,
+            user=self.user,
+            amount_owed=Decimal('20.00'),
+        )
+        self.settled_expense = Expense.objects.create(
+            group=self.group,
+            paid_by=self.other,
+            created_by=self.other,
+            title='Já quitei',
+            amount=Decimal('15.00'),
+            date=date(2026, 11, 3),
+        )
+        ExpenseSplit.objects.create(
+            expense=self.settled_expense,
+            user=self.user,
+            amount_owed=Decimal('15.00'),
+            is_paid=True,
+        )
+        self.client.force_login(self.user)
+        self.history_url = reverse('personal_history')
+
+    def test_historico_mostra_valores_pagos_por_mim_e_cotas_pendentes_ou_quitadas(self):
+        response = self.client.get(self.history_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_to_pay'], Decimal('20.00'))
+        self.assertEqual(response.context['total_paid_by_me'], Decimal('15.00'))
+        self.assertEqual(response.context['total_expenses_paid_by_me'], Decimal('50.00'))
+        self.assertContains(response, 'Paguei no local')
+        self.assertContains(response, 'Ainda devo')
+        self.assertContains(response, 'Já quitei')
+
+    def test_filtro_de_status_afeta_cotas_sem_ocultar_despesas_pagas_por_mim(self):
+        response = self.client.get(self.history_url, {'status': 'pending'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context['splits'].values_list('expense__title', flat=True)), ['Ainda devo'])
+        self.assertEqual(list(response.context['expenses_paid_by_me'].values_list('title', flat=True)), ['Paguei no local'])
+        self.assertContains(response, 'Ainda devo')
+        self.assertNotContains(response, 'Já quitei')
