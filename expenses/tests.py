@@ -478,3 +478,64 @@ class GroupFinancialDepartureTests(TestCase):
         ExpenseSplit.objects.filter(pk=split.pk).update(is_paid=True)
         self.client.post(self.leave, {'confirm_delete': 'yes'})
         self.assertFalse(Group.objects.filter(pk=self.group.pk).exists())
+
+
+class SplitAmountValidationTests(TestCase):
+    def setUp(self):
+        self.users = [CustomUser.objects.create_user(username=f'split_user_{i}') for i in range(3)]
+        self.group = Group.objects.create(name='Divisões', created_by=self.users[0])
+        for user in self.users[1:]:
+            GroupMembership.objects.create(group=self.group, user=user, is_accepted=True)
+        self.members = list(GroupMembership.objects.filter(group=self.group))
+
+    def parse(self, values, mode='value', total='10.00'):
+        from .forms import parse_splits_from_post
+        data = {'split_mode': mode}
+        for user, value in zip(self.users, values):
+            data[f'split_participates_{user.pk}'] = 'on'
+            data[f'split_amount_{user.pk}'] = value
+        return parse_splits_from_post(data, self.members, Decimal(total))
+
+    def test_soma_monetaria_inferior_e_superior(self):
+        for value in ('9.99', '10.01'):
+            with self.subTest(value=value):
+                self.assertTrue(self.parse([value])[1])
+
+    def test_percentuais_diferentes_de_cem(self):
+        for value in ('99.99', '100.01'):
+            with self.subTest(value=value):
+                self.assertTrue(self.parse([value], 'percentage')[1])
+
+    def test_percentuais_validos_e_maiores_restos(self):
+        splits, errors = self.parse(['33.33', '33.33', '33.34'], 'percentage')
+        self.assertFalse(errors)
+        self.assertEqual([splits[u.pk] for u in self.users], [Decimal('3.33'), Decimal('3.33'), Decimal('3.34')])
+        splits, errors = self.parse(['50', '50'], 'percentage', '0.03')
+        self.assertFalse(errors)
+        self.assertEqual([splits[u.pk] for u in self.users[:2]], [Decimal('0.02'), Decimal('0.01')])
+
+    def test_entradas_invalidas_e_divisao_menor_que_um_centavo(self):
+        for value in ('0', '-1', 'NaN', 'Infinity', 'abc', '0.001'):
+            with self.subTest(value=value):
+                self.assertTrue(self.parse([value])[1])
+        self.assertTrue(self.parse(['50', '50'], 'percentage', '0.01')[1])
+
+    def test_formulario_preserva_campos_invalidos(self):
+        self.client.force_login(self.users[0])
+        data = {'title': 'Teste', 'amount': '10.00', 'date': '2026-11-19', 'paid_by': self.users[0].pk, 'split_mode': 'percentage', f'split_participates_{self.users[0].pk}': 'on', f'split_amount_{self.users[0].pk}': 'inválido'}
+        response = self.client.post(reverse('expense_create', args=[self.group.pk]), data)
+        self.assertContains(response, 'value="inválido"')
+        self.assertContains(response, 'value="percentage" selected')
+
+    def test_cria_despesa_com_percentuais_em_reais(self):
+        self.client.force_login(self.users[0])
+        data = {'title': 'Percentual', 'amount': '0.03', 'date': '2026-11-19',
+                'paid_by': self.users[0].pk, 'split_mode': 'percentage'}
+        for user in self.users[:2]:
+            data[f'split_participates_{user.pk}'] = 'on'
+            data[f'split_amount_{user.pk}'] = '50'
+        response = self.client.post(reverse('expense_create', args=[self.group.pk]), data)
+        self.assertEqual(response.status_code, 302)
+        expense = Expense.objects.get(group=self.group, title='Percentual')
+        amounts = dict(expense.splits.values_list('user_id', 'amount_owed'))
+        self.assertEqual(amounts, {self.users[0].pk: Decimal('0.02'), self.users[1].pk: Decimal('0.01')})

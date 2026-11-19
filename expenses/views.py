@@ -358,9 +358,8 @@ def expense_create(request, group_id):
     participant_rows = []
     for m in accepted_memberships:
         uid = m.user_id
-        is_checked = (uid in splits_data) if request.method == 'POST' else True
-        amount_val = splits_data.get(uid)
-        amount_str = f'{amount_val:.2f}' if amount_val is not None else ''
+        is_checked = request.POST.get(f'split_participates_{uid}') == 'on' if request.method == 'POST' else True
+        amount_str = request.POST.get(f'split_amount_{uid}', '') if request.method == 'POST' else ''
         participant_rows.append({
             'user': m.user,
             'checked': is_checked,
@@ -371,6 +370,7 @@ def expense_create(request, group_id):
         'form': form,
         'group': group,
         'participant_rows': participant_rows,
+        'split_mode': request.POST.get('split_mode', 'value'),
         'is_edit': False,
     })
 
@@ -481,13 +481,13 @@ def expense_update(request, pk):
     for m in accepted_memberships:
         uid = m.user_id
         if request.method == 'POST':
-            is_checked = uid in splits_data
-            amount_val = splits_data.get(uid)
+            is_checked = request.POST.get(f'split_participates_{uid}') == 'on'
+            amount_str = request.POST.get(f'split_amount_{uid}', '')
         else:
             is_checked = uid in existing_splits_map
             amount_val = existing_splits_map[uid].amount_owed if uid in existing_splits_map else None
+            amount_str = f'{amount_val:.2f}' if amount_val is not None else ''
 
-        amount_str = f'{amount_val:.2f}' if amount_val is not None else ''
         participant_rows.append({
             'user': m.user,
             'checked': is_checked,
@@ -499,6 +499,7 @@ def expense_update(request, pk):
         'group': group,
         'expense': expense,
         'participant_rows': participant_rows,
+        'split_mode': request.POST.get('split_mode', 'value'),
         'is_edit': True,
     })
 

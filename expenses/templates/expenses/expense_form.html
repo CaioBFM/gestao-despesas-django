@@ -52,13 +52,21 @@
                     </div>
                     <p class="small text-muted">Marque quem participa da divisão e informe o valor devido por cada pessoa.</p>
 
+                    <div class="mb-3">
+                        <label for="split-mode" class="form-label fw-bold">Modo de divisão</label>
+                        <select id="split-mode" name="split_mode" class="form-select">
+                            <option value="value" {% if split_mode == 'value' %}selected{% endif %}>Valor (R$)</option>
+                            <option value="percentage" {% if split_mode == 'percentage' %}selected{% endif %}>Porcentagem (%)</option>
+                        </select>
+                    </div>
+
                     <div class="table-responsive border rounded mb-4">
                         <table class="table table-hover mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
                                     <th style="width: 90px;">Participa</th>
                                     <th>Membro</th>
-                                    <th style="width: 200px;">Valor Devido (R$)</th>
+                                    <th style="width: 200px;" id="split-heading">Valor devido</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -77,9 +85,7 @@
                                         </label>
                                     </td>
                                     <td>
-                                        <input type="number"
-                                               step="0.01"
-                                               min="0.01"
+                                        <input type="text" inputmode="decimal"
                                                class="form-control form-control-sm split-amount"
                                                name="split_amount_{{ row.user.pk }}"
                                                value="{{ row.amount }}"
@@ -96,6 +102,8 @@
                             </tbody>
                         </table>
                     </div>
+                    <p id="split-total" class="small fw-semibold" aria-live="polite"></p>
+                    <p id="split-warning" class="text-danger small" aria-live="polite"></p>
 
                     <div class="d-flex justify-content-between">
                         {% if is_edit %}
@@ -115,40 +123,42 @@
 </div>
 
 <script>
-function splitEqually() {
-    const totalInput = document.getElementById('id_amount');
-    const total = parseFloat(totalInput.value);
-    if (isNaN(total) || total <= 0) {
-        alert('Informe um Valor Total maior que zero antes de dividir igualmente.');
-        return;
-    }
+const splitMode = document.getElementById('split-mode');
+const totalInput = document.getElementById('id_amount');
+const checkboxes = document.querySelectorAll('.split-checkbox');
 
-    const rows = document.querySelectorAll('.split-checkbox');
-    const checkedInputs = [];
-    rows.forEach((chk) => {
-        if (chk.checked) {
-            const tr = chk.closest('tr');
-            const amtInput = tr.querySelector('.split-amount');
-            if (amtInput) checkedInputs.push(amtInput);
-        }
-    });
-
-    if (checkedInputs.length === 0) {
-        alert('Marque ao menos um participante para dividir o valor.');
-        return;
-    }
-
-    const baseShare = Math.floor((total / checkedInputs.length) * 100) / 100;
-    let remainder = Math.round((total - baseShare * checkedInputs.length) * 100) / 100;
-
-    checkedInputs.forEach((inp) => {
-        let share = baseShare;
-        if (remainder > 0) {
-            share = Math.round((share + 0.01) * 100) / 100;
-            remainder = Math.round((remainder - 0.01) * 100) / 100;
-        }
-        inp.value = share.toFixed(2);
-    });
+function selectedInputs() {
+    return Array.from(checkboxes).filter(chk => chk.checked)
+        .map(chk => chk.closest('tr').querySelector('.split-amount'));
 }
+
+function updateSplitTotal() {
+    const percentage = splitMode.value === 'percentage';
+    const sum = selectedInputs().reduce((total, input) => total + (Number(input.value.replace(',', '.')) || 0), 0);
+    const target = percentage ? 100 : Number(totalInput.value) || 0;
+    document.getElementById('split-heading').textContent = percentage ? 'Percentual (%)' : 'Valor devido (R$)';
+    document.getElementById('split-total').textContent = percentage
+        ? `Percentual acumulado: ${sum.toFixed(2)}% — Total distribuído aproximado: R$ ${((Number(totalInput.value) || 0) * sum / 100).toFixed(2)}` : `Total distribuído: R$ ${sum.toFixed(2)}`;
+    document.getElementById('split-warning').textContent = Math.abs(sum - target) > 0.000001
+        ? (percentage ? 'A soma dos percentuais deve ser exatamente 100%.' : 'A soma das divisões deve ser igual ao valor total.') : '';
+}
+
+function splitEqually() {
+    const inputs = selectedInputs();
+    const total = splitMode.value === 'percentage' ? 100 : Number(totalInput.value);
+    if (!inputs.length || !Number.isFinite(total) || total <= 0) {
+        alert('Informe o valor total e selecione ao menos um participante.');
+        return;
+    }
+    const units = Math.round(total * 100);
+    const base = Math.floor(units / inputs.length);
+    const remainder = units % inputs.length;
+    inputs.forEach((input, index) => { input.value = ((base + (index < remainder ? 1 : 0)) / 100).toFixed(2); });
+    updateSplitTotal();
+}
+
+document.getElementById('expense-form').addEventListener('input', updateSplitTotal);
+splitMode.addEventListener('change', updateSplitTotal);
+updateSplitTotal();
 </script>
 {% endblock %}
