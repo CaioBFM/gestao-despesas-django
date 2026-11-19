@@ -36,15 +36,18 @@ class Group(models.Model):
                 return code
 
     def save(self, *args, **kwargs):
+        is_new = self._state.adding
         if not self.invite_code:
             self.invite_code = self.generate_invite_code()
         with transaction.atomic():
             super().save(*args, **kwargs)
-            GroupMembership.objects.update_or_create(
-                group=self,
-                user=self.created_by,
-                defaults={'is_accepted': True, 'is_group_admin': True},
-            )
+            if is_new:
+                GroupMembership.objects.create(
+                    group=self,
+                    user=self.created_by,
+                    is_accepted=True,
+                    is_group_admin=True,
+                )
 
 class GroupMembership(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -71,12 +74,6 @@ class GroupMembership(models.Model):
             raise ValidationError({
                 'is_group_admin': 'Um membro precisa ser aceito antes de se tornar administrador do grupo.'
             })
-        if (
-            self.group_id and self.user_id
-            and Group.objects.filter(pk=self.group_id, created_by_id=self.user_id).exists()
-            and (not self.is_accepted or not self.is_group_admin)
-        ):
-            raise ValidationError('O criador do grupo deve permanecer como membro aceito e administrador.')
 
     def save(self, *args, **kwargs):
         self.full_clean(validate_unique=False, validate_constraints=False)

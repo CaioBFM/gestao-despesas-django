@@ -1,6 +1,5 @@
-
 from django.shortcuts import render, redirect
-from .forms import CadastroForm
+from .forms import CadastroForm, UserProfileForm
 from django.contrib.auth.decorators import login_required
 from decimal import Decimal
 
@@ -70,3 +69,14 @@ def cadastro(request):
         form = CadastroForm()
 
     return render(request, "accounts/cadastro.html", {"form": form})
+
+@login_required
+def perfil_usuario(request):
+    if request.method == 'POST':
+        form = UserProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('perfil')
+    else:
+        form = UserProfileForm(instance=request.user)
+    return render(request, 'accounts/perfil.html', {'form': form})
